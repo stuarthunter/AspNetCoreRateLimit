@@ -9,11 +9,9 @@ namespace AspNetCoreRateLimit
         private readonly IRateLimitCounterStore _counterStore;
         private readonly bool _ipRateLimiting;
 
-        private static readonly object _processLocker = new object();
-
         public RateLimitCore(bool ipRateLimiting,
             RateLimitCoreOptions options,
-           IRateLimitCounterStore counterStore)
+            IRateLimitCounterStore counterStore)
         {
             _ipRateLimiting = ipRateLimiting;
             _options = options;
@@ -46,71 +44,21 @@ namespace AspNetCoreRateLimit
             return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
         }
 
-        public RateLimitCounter ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public RateLimitResult ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
         {
-            var counter = new RateLimitCounter
+            var counterId = ComputeCounterKey(requestIdentity, rule);
+            return _counterStore.AddRequest(counterId, rule);
+        }
+
+        public RateLimitHeaders GetRateLimitHeaders(RateLimitRule rule, RateLimitResult result)
+        {
+            var headers = new RateLimitHeaders
             {
-                Timestamp = DateTime.UtcNow,
-                TotalRequests = 1
+                Reset = result.Expiry.ToString("o", DateTimeFormatInfo.InvariantInfo),
+                Limit = rule.Period,
+                Remaining = result.Remaining.ToString()
             };
-
-            var counterId = ComputeCounterKey(requestIdentity, rule);
-
-            // serial reads and writes
-            lock (_processLocker)
-            {
-                var entry = _counterStore.Get(counterId);
-                if (entry.HasValue)
-                {
-                    // entry has not expired
-                    if (entry.Value.Timestamp + rule.PeriodTimespan.Value >= DateTime.UtcNow)
-                    {
-                        // increment request count
-                        var totalRequests = entry.Value.TotalRequests + 1;
-
-                        // deep copy
-                        counter = new RateLimitCounter
-                        {
-                            Timestamp = entry.Value.Timestamp,
-                            TotalRequests = totalRequests
-                        };
-                    }
-                }
-
-                // stores: id (string) - timestamp (datetime) - total_requests (long)
-                _counterStore.Set(counterId, counter, rule.PeriodTimespan.Value);
-            }
-
-            return counter;
-        }
-
-        public RateLimitHeaders GetRateLimitHeaders(ClientRequestIdentity requestIdentity, RateLimitRule rule)
-        {
-            var headers = new RateLimitHeaders();
-            var counterId = ComputeCounterKey(requestIdentity, rule);
-            var entry = _counterStore.Get(counterId);
-            if (entry.HasValue)
-            {
-                headers.Reset = (entry.Value.Timestamp + ConvertToTimeSpan(rule.Period)).ToUniversalTime().ToString("o", DateTimeFormatInfo.InvariantInfo);
-                headers.Limit = rule.Period;
-                headers.Remaining = (rule.Limit - entry.Value.TotalRequests).ToString();
-            }
-            else
-            {
-                headers.Reset = (DateTime.UtcNow + ConvertToTimeSpan(rule.Period)).ToUniversalTime().ToString("o", DateTimeFormatInfo.InvariantInfo);
-                headers.Limit = rule.Period;
-                headers.Remaining = rule.Limit .ToString();
-            }
-
             return headers;
-        }
-
-        public string RetryAfterFrom(DateTime timestamp, RateLimitRule rule)
-        {
-            var secondsPast = Convert.ToInt32((DateTime.UtcNow - timestamp).TotalSeconds);
-            var retryAfter = Convert.ToInt32(rule.PeriodTimespan.Value.TotalSeconds);
-            retryAfter = retryAfter > 1 ? retryAfter - secondsPast : 1;
-            return retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         public TimeSpan ConvertToTimeSpan(string timeSpan)

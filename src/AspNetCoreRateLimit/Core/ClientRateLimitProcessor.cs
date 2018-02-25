@@ -7,21 +7,16 @@ namespace AspNetCoreRateLimit
     public class ClientRateLimitProcessor
     {
         private readonly ClientRateLimitOptions _options;
-        private readonly IRateLimitCounterStore _counterStore;
         private readonly IClientPolicyStore _policyStore;
         private readonly RateLimitCore _core;
-
-        private static readonly object _processLocker = new object();
 
         public ClientRateLimitProcessor(ClientRateLimitOptions options,
            IRateLimitCounterStore counterStore,
            IClientPolicyStore policyStore)
         {
             _options = options;
-            _counterStore = counterStore;
             _policyStore = policyStore;
-
-            _core = new RateLimitCore(false, options, _counterStore);
+            _core = new RateLimitCore(false, options, counterStore);
         }
 
         public List<RateLimitRule> GetMatchingRules(ClientRequestIdentity identity)
@@ -118,19 +113,14 @@ namespace AspNetCoreRateLimit
             return false;
         }
 
-        public RateLimitCounter ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public RateLimitResult ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
         {
             return _core.ProcessRequest(requestIdentity, rule);
         }
 
-        public RateLimitHeaders GetRateLimitHeaders(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public RateLimitHeaders GetRateLimitHeaders(RateLimitRule rule, RateLimitResult result)
         {
-            return _core.GetRateLimitHeaders(requestIdentity, rule);
-        }
-
-        public string RetryAfterFrom(DateTime timestamp, RateLimitRule rule)
-        {
-            return _core.RetryAfterFrom(timestamp, rule);
+            return _core.GetRateLimitHeaders(rule, result);
         }
     }
 }

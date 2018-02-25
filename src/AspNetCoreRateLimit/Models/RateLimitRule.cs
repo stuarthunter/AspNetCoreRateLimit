@@ -24,6 +24,11 @@ namespace AspNetCoreRateLimit
         /// <summary>
         /// Maximum number of requests that a client can make in a defined period
         /// </summary>
-        public long Limit { get; set; }
+        public int Limit { get; set; }
+
+        /// <summary>
+        /// Determines whether to use sliding expiration.  Not recommended for rules with high limits as individual request timestamps are stored.
+        /// </summary>
+        public bool UseSlidingExpiration { get; set; }
     }
 }

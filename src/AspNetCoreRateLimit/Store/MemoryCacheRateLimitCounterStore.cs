@@ -6,37 +6,57 @@ namespace AspNetCoreRateLimit
     public class MemoryCacheRateLimitCounterStore: IRateLimitCounterStore
     {
         private readonly IMemoryCache _memoryCache;
+        private readonly object _lock = new object();
 
         public MemoryCacheRateLimitCounterStore(IMemoryCache memoryCache)
         {
             _memoryCache = memoryCache;
         }
 
-        public void Set(string id, RateLimitCounter counter, TimeSpan expirationTime)
+        public RateLimitResult AddRequest(string id, RateLimitRule rule)
         {
-            _memoryCache.Set(id, counter, new MemoryCacheEntryOptions().SetAbsoluteExpiration(expirationTime));
-        }
-
-        public bool Exists(string id)
-        {
-            RateLimitCounter stored;
-            return _memoryCache.TryGetValue(id, out stored);
-        }
-
-        public RateLimitCounter? Get(string id)
-        {
-            RateLimitCounter stored;
-            if (_memoryCache.TryGetValue(id, out stored))
+            var counter = Get(id);
+            if (counter == null || counter.IsExpired)
             {
-                return stored;
+                // serial create of new rate limit counter
+                lock (_lock)
+                {
+                    counter = Get(id);
+                    if (counter == null || counter.IsExpired)
+                    {
+                        counter = new RateLimitCounter(rule.UseSlidingExpiration, rule.PeriodTimespan.Value);
+                        Set(id, counter, rule.PeriodTimespan.Value, rule.UseSlidingExpiration);
+
+                        return new RateLimitResult
+                        {
+                            Success = true,
+                            Remaining = rule.Limit - 1,
+                            Expiry = DateTime.UtcNow.Add(rule.PeriodTimespan.Value)
+                        };
+                    }
+                }
             }
 
-            return null;
+            return counter.AddRequest(rule.Limit);
         }
 
-        public void Remove(string id)
+        private RateLimitCounter Get(string id)
         {
-            _memoryCache.Remove(id);
+            return _memoryCache.TryGetValue(id, out RateLimitCounter stored) ? stored : null;
+        }
+
+        private void Set(string id, RateLimitCounter counter, TimeSpan expirationPeriod, bool slidingExpiration)
+        {
+            var options = new MemoryCacheEntryOptions();
+            if (slidingExpiration)
+            {
+                options.SetSlidingExpiration(expirationPeriod);
+            }
+            else
+            {
+                options.SetAbsoluteExpiration(expirationPeriod);
+            }
+            _memoryCache.Set(id, counter, options);
         }
     }
 }

@@ -8,12 +8,9 @@ namespace AspNetCoreRateLimit
     public class IpRateLimitProcessor
     {
         private readonly IpRateLimitOptions _options;
-        private readonly IRateLimitCounterStore _counterStore;
         private readonly IIpPolicyStore _policyStore;
         private readonly IIpAddressParser _ipParser;
         private readonly RateLimitCore _core;
-
-        private static readonly object _processLocker = new object();
 
         public IpRateLimitProcessor(IpRateLimitOptions options,
            IRateLimitCounterStore counterStore,
@@ -21,11 +18,9 @@ namespace AspNetCoreRateLimit
            IIpAddressParser ipParser)
         {
             _options = options;
-            _counterStore = counterStore;
             _policyStore = policyStore;
             _ipParser = ipParser;
-
-            _core = new RateLimitCore(true, options, _counterStore);
+            _core = new RateLimitCore(true, options, counterStore);
         }
 
         public List<RateLimitRule> GetMatchingRules(ClientRequestIdentity identity)
@@ -135,19 +130,14 @@ namespace AspNetCoreRateLimit
             return false;
         }
 
-        public RateLimitCounter ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public RateLimitResult ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
         {
             return _core.ProcessRequest(requestIdentity, rule);
         }
 
-        public RateLimitHeaders GetRateLimitHeaders(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public RateLimitHeaders GetRateLimitHeaders(RateLimitRule rule, RateLimitResult result)
         {
-            return _core.GetRateLimitHeaders(requestIdentity, rule);
-        }
-
-        public string RetryAfterFrom(DateTime timestamp, RateLimitRule rule)
-        {
-            return _core.RetryAfterFrom(timestamp, rule);
+            return _core.GetRateLimitHeaders(rule, result);
         }
     }
 }

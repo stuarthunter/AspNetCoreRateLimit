@@ -13,30 +13,50 @@ namespace AspNetCoreRateLimit
             _memoryCache = memoryCache;
         }
 
-        public void Set(string id, RateLimitCounter counter, TimeSpan expirationTime)
+        public RateLimitResult AddRequest(string id, RateLimitRule rule)
         {
-            _memoryCache.SetString(id, JsonConvert.SerializeObject(counter), new DistributedCacheEntryOptions().SetAbsoluteExpiration(expirationTime));
-        }
+            // TODO: REQUIRES REVIEW.  
+            // RateLimitCounter should not be serialised to distributed cache.
+            // Directly store underlying data to facilitate atomic distributed updates.
+            // REDIS example: http://tech.domain.com.au/2017/11/protect-your-api-resources-with-rate-limiting/
 
-        public bool Exists(string id)
-        {
-            var stored = _memoryCache.GetString(id);
-            return !string.IsNullOrEmpty(stored);
-        }
-
-        public RateLimitCounter? Get(string id)
-        {
-            var stored = _memoryCache.GetString(id);
-            if(!string.IsNullOrEmpty(stored))
+            var counter = Get(id);
+            if (counter == null)
             {
-                return JsonConvert.DeserializeObject<RateLimitCounter>(stored);
+                counter = new RateLimitCounter(rule.UseSlidingExpiration, rule.PeriodTimespan.Value);
+                Set(id, counter, rule.PeriodTimespan.Value, rule.UseSlidingExpiration);
+
+                return new RateLimitResult
+                {
+                    Success = true,
+                    Remaining = rule.Limit - 1,
+                    Expiry = DateTime.UtcNow.Add(rule.PeriodTimespan.Value)
+                };
             }
-            return null;
+
+            return counter.AddRequest(rule.Limit);
         }
 
-        public void Remove(string id)
+        private RateLimitCounter Get(string id)
         {
-            _memoryCache.Remove(id);
+            var stored = _memoryCache.GetString(id);
+            return !string.IsNullOrEmpty(stored) 
+                ? JsonConvert.DeserializeObject<RateLimitCounter>(stored) 
+                : null;
+        }
+
+        private void Set(string id, RateLimitCounter counter, TimeSpan expirationPeriod, bool slidingExpiration)
+        {
+            var options = new DistributedCacheEntryOptions();
+            if (slidingExpiration)
+            {
+                options.SetSlidingExpiration(expirationPeriod);
+            }
+            else
+            {
+                options.SetAbsoluteExpiration(expirationPeriod);
+            }
+            _memoryCache.SetString(id, JsonConvert.SerializeObject(counter), options);
         }
     }
 }
