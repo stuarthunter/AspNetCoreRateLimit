@@ -1,6 +1,6 @@
 ﻿using AspNetCoreRateLimit.Models;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Store
 {
     public interface IClientPolicyStore
     {

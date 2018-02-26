@@ -3,7 +3,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Store
 {
     public class DistributedCacheClientPolicyStore : IClientPolicyStore
     {
@@ -16,7 +16,7 @@ namespace AspNetCoreRateLimit
             _memoryCache = memoryCache;
 
             //save client rules defined in appsettings in distributed cache on startup
-            if (options != null && options.Value != null && policies != null && policies.Value != null && policies.Value.ClientRules != null)
+            if (options?.Value != null && policies?.Value?.ClientRules != null)
             {
                 foreach (var rule in policies.Value.ClientRules)
                 {
@@ -38,6 +38,10 @@ namespace AspNetCoreRateLimit
 
         public ClientRateLimitPolicy Get(string id)
         {
+            // TODO: REQUIRES REVIEW 
+            // No need to fetch from remote store for every request
+            // Cache locally for 1 min?
+
             var stored = _memoryCache.GetString(id);
             if (!string.IsNullOrEmpty(stored))
             {

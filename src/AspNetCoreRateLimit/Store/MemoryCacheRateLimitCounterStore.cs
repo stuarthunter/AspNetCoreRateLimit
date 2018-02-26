@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using System;
+﻿using System;
 using AspNetCoreRateLimit.Models;
+using Microsoft.Extensions.Caching.Memory;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Store
 {
     public class MemoryCacheRateLimitCounterStore: IRateLimitCounterStore
     {
@@ -44,6 +44,7 @@ namespace AspNetCoreRateLimit
 
         private RateLimitCounter Get(string id)
         {
+            // ReSharper disable once InconsistentlySynchronizedField
             return _memoryCache.TryGetValue(id, out RateLimitCounter stored) ? stored : null;
         }
 

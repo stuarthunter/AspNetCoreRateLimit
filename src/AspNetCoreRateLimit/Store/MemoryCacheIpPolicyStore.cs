@@ -1,10 +1,8 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using AspNetCoreRateLimit.Models;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using AspNetCoreRateLimit.Models;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Store
 {
     public class MemoryCacheIpPolicyStore : IIpPolicyStore
     {
@@ -17,10 +15,9 @@ namespace AspNetCoreRateLimit
             _memoryCache = memoryCache;
 
             //save ip rules defined in appsettings in cache on startup
-            if (options != null && options.Value != null && policies != null && policies.Value != null && policies.Value.IpRules != null)
+            if (options?.Value != null && policies?.Value?.IpRules != null)
             {
                 Set($"{options.Value.IpPolicyPrefix}", policies.Value);
-
             }
         }
 
@@ -31,14 +28,12 @@ namespace AspNetCoreRateLimit
 
         public bool Exists(string id)
         {
-            IpRateLimitPolicies stored;
-            return _memoryCache.TryGetValue(id, out stored);
+            return _memoryCache.TryGetValue(id, out IpRateLimitPolicies _);
         }
 
         public IpRateLimitPolicies Get(string id)
         {
-            IpRateLimitPolicies stored;
-            if (_memoryCache.TryGetValue(id, out stored))
+            if (_memoryCache.TryGetValue(id, out IpRateLimitPolicies stored))
             {
                 return stored;
             }

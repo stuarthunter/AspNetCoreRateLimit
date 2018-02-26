@@ -1,9 +1,9 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using AspNetCoreRateLimit.Models;
+using Microsoft.Extensions.Caching.Distributed;
+using Newtonsoft.Json;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Store
 {
     public class DistributedCacheRateLimitCounterStore : IRateLimitCounterStore
     {
@@ -16,7 +16,7 @@ namespace AspNetCoreRateLimit
 
         public RateLimitResult AddRequest(string id, RateLimitRule rule)
         {
-            // TODO: REQUIRES REVIEW.  
+            // TODO: REQUIRES REVIEW 
             // RateLimitCounter should not be serialised to distributed cache.
             // Directly store underlying data to facilitate atomic distributed updates.
             // REDIS example: http://tech.domain.com.au/2017/11/protect-your-api-resources-with-rate-limiting/

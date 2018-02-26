@@ -1,10 +1,8 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using AspNetCoreRateLimit.Models;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using AspNetCoreRateLimit.Models;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Store
 {
     public class MemoryCacheClientPolicyStore: IClientPolicyStore
     {
@@ -17,11 +15,16 @@ namespace AspNetCoreRateLimit
             _memoryCache = memoryCache;
 
             //save client rules defined in appsettings in cache on startup
-            if(options != null && options.Value != null && policies != null && policies.Value != null && policies.Value.ClientRules != null)
+            if(options?.Value != null && policies?.Value?.ClientRules != null)
             {
                 foreach (var rule in policies.Value.ClientRules)
                 {
-                    Set($"{options.Value.ClientPolicyPrefix}_{rule.ClientId}", new ClientRateLimitPolicy { ClientId = rule.ClientId, Rules = rule.Rules });
+                    Set($"{options.Value.ClientPolicyPrefix}_{rule.ClientId}",
+                        new ClientRateLimitPolicy
+                        {
+                            ClientId = rule.ClientId,
+                            Rules = rule.Rules
+                        });
                 }
             }
         }
@@ -33,14 +36,12 @@ namespace AspNetCoreRateLimit
 
         public bool Exists(string id)
         {
-            ClientRateLimitPolicy stored;
-            return _memoryCache.TryGetValue(id, out stored);
+            return _memoryCache.TryGetValue(id, out ClientRateLimitPolicy _);
         }
 
         public ClientRateLimitPolicy Get(string id)
         {
-            ClientRateLimitPolicy stored;
-            if (_memoryCache.TryGetValue(id, out stored))
+            if (_memoryCache.TryGetValue(id, out ClientRateLimitPolicy stored))
             {
                 return stored;
             }

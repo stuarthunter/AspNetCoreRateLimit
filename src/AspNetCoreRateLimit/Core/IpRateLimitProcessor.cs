@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AspNetCoreRateLimit.Models;
 using AspNetCoreRateLimit.Net;
+using AspNetCoreRateLimit.Store;
 using Microsoft.AspNetCore.Http;
 
 namespace AspNetCoreRateLimit.Core

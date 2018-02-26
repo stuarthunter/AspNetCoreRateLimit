@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AspNetCoreRateLimit.Core;
 using AspNetCoreRateLimit.Models;
+using AspNetCoreRateLimit.Store;
 
 namespace AspNetCoreRateLimit
 {
