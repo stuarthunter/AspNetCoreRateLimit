@@ -1,143 +1,95 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using AspNetCoreRateLimit.Core;
+using AspNetCoreRateLimit.Models;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Core
 {
-    public class IpRateLimitProcessor
+    public class IpRateLimitProcessor : RateLimitProcessor
     {
         private readonly IpRateLimitOptions _options;
         private readonly IIpPolicyStore _policyStore;
         private readonly IIpAddressParser _ipParser;
-        private readonly RateLimitCore _core;
 
         public IpRateLimitProcessor(IpRateLimitOptions options,
-           IRateLimitCounterStore counterStore,
-           IIpPolicyStore policyStore,
-           IIpAddressParser ipParser)
+            IRateLimitCounterStore counterStore,
+            IIpPolicyStore policyStore,
+            IIpAddressParser ipParser)
+            : base(options, counterStore)
         {
             _options = options;
             _policyStore = policyStore;
             _ipParser = ipParser;
-            _core = new RateLimitCore(true, options, counterStore);
         }
 
-        public List<RateLimitRule> GetMatchingRules(ClientRequestIdentity identity)
+        public override string ComputeCounterKey(ClientRequestIdentity requestIdentity, RateLimitRule rule)
         {
-            var limits = new List<RateLimitRule>();
-            var policies = _policyStore.Get($"{_options.IpPolicyPrefix}");
+            return $"{_options.RateLimitCounterPrefix}_{requestIdentity.ClientIp}_{rule.Period}_{rule.Endpoint}";
+        }
 
-            if (policies != null && policies.IpRules != null && policies.IpRules.Any())
+        public override List<RateLimitRule> GetMatchingRules(ClientRequestIdentity identity)
+        {
+            var result = new List<RateLimitRule>();
+
+            // get matching IP rules
+            var policies = _policyStore.Get($"{_options.IpPolicyPrefix}");
+            if (policies?.IpRules != null && policies.IpRules.Any())
             {
                 // search for rules with IP intervals containing client IP
-                var matchPolicies = policies.IpRules.Where(r => _ipParser.ContainsIp(r.Ip, identity.ClientIp)).AsEnumerable();
-                var rules = new List<RateLimitRule>();
-                foreach (var item in matchPolicies)
+                var matchPolicies = policies.IpRules.Where(x => _ipParser.ContainsIp(x.Ip, identity.ClientIp));
+                var policyRules = new RateLimitRules();
+                foreach (var policy in matchPolicies)
                 {
-                    rules.AddRange(item.Rules);
+                    policyRules.AddRange(policy.Rules);
                 }
 
                 if (_options.EnableEndpointRateLimiting)
                 {
-                    // search for rules with endpoints like "*" and "*:/matching_path"
-                    var pathLimits = rules.Where(l => $"*:{identity.Path}".ToLowerInvariant().Contains(l.Endpoint.ToLowerInvariant())).AsEnumerable();
-                    limits.AddRange(pathLimits);
-
-                    // search for rules with endpoints like "matching_verb:/matching_path"
-                    var verbLimits = rules.Where(l => $"{identity.HttpVerb}:{identity.Path}".ToLowerInvariant().Contains(l.Endpoint.ToLowerInvariant())).AsEnumerable();
-                    limits.AddRange(verbLimits);
+                    var rules = policyRules.GetEndpointRules(identity.HttpVerb, identity.Path);
+                    result.AddRange(rules);
                 }
                 else
                 {
-                    //ignore endpoint rules and search for global rules only
-                    var genericLimits = rules.Where(l => l.Endpoint == "*").AsEnumerable();
-                    limits.AddRange(genericLimits);
+                    var rules = policyRules.GetGlobalRules(identity.HttpVerb);
+                    result.AddRange(rules);
                 }
+
+                // get the most restrictive limit for each period 
+                result = result.GroupBy(x => x.Period)
+                    .Select(x => x.OrderBy(y => y.Limit).First())
+                    .ToList();
             }
 
-            // get the most restrictive limit for each period 
-            limits = limits.GroupBy(l => l.Period).Select(l => l.OrderBy(x => x.Limit)).Select(l => l.First()).ToList();
-
-            // search for matching general rules
-            if (_options.GeneralRules != null)
+            // add general rule if no specific client rule exists for period
+            var generalRules = GetMatchingGeneralRules(identity);
+            if (generalRules != null && generalRules.Any())
             {
-                var matchingGeneralLimits = new List<RateLimitRule>();
-                if (_options.EnableEndpointRateLimiting)
+                foreach (var limit in generalRules)
                 {
-                    // search for rules with endpoints like "*" and "*:/matching_path" in general rules
-                    var pathLimits = _options.GeneralRules.Where(l => $"*:{identity.Path}".ToLowerInvariant().Contains(l.Endpoint.ToLowerInvariant())).AsEnumerable();
-                    matchingGeneralLimits.AddRange(pathLimits);
-
-                    // search for rules with endpoints like "matching_verb:/matching_path" in general rules
-                    var verbLimits = _options.GeneralRules.Where(l => $"{identity.HttpVerb}:{identity.Path}".ToLowerInvariant().IsMatch(l.Endpoint.ToLowerInvariant())).AsEnumerable();
-                    matchingGeneralLimits.AddRange(verbLimits);
-                }
-                else
-                {
-                    //ignore endpoint rules and search for global rules in general rules
-                    var genericLimits = _options.GeneralRules.Where(l => l.Endpoint == "*").AsEnumerable();
-                    matchingGeneralLimits.AddRange(genericLimits);
-                }
-
-                // get the most restrictive general limit for each period 
-                var generalLimits = matchingGeneralLimits.GroupBy(l => l.Period).Select(l => l.OrderBy(x => x.Limit)).Select(l => l.First()).ToList();
-
-                foreach (var generalLimit in generalLimits)
-                {
-                    // add general rule if no specific rule is declared for the specified period
-                    if(!limits.Exists(l => l.Period == generalLimit.Period))
+                    if (!result.Exists(x => x.Period == limit.Period))
                     {
-                        limits.Add(generalLimit);
+                        result.Add(limit);
                     }
                 }
             }
 
-            foreach (var item in limits)
+            // order by period
+            result = result.OrderBy(x => x.GetPeriodTimeSpan()).ToList();
+            if (_options.StackBlockedRequests)
             {
-                //parse period text into time spans
-                item.PeriodTimespan = _core.ConvertToTimeSpan(item.Period);
+                result.Reverse();
             }
 
-            limits = limits.OrderBy(l => l.PeriodTimespan).ToList();
-            if(_options.StackBlockedRequests)
-            {
-                limits.Reverse();   
-            }
-
-            return limits;
+            return result;
         }
 
-        public bool IsWhitelisted(ClientRequestIdentity requestIdentity)
+        public override bool IsWhitelisted(ClientRequestIdentity requestIdentity)
         {
             if (_options.IpWhitelist != null && _ipParser.ContainsIp(_options.IpWhitelist, requestIdentity.ClientIp))
             {
                 return true;
             }
 
-            if (_options.ClientWhitelist != null && _options.ClientWhitelist.Contains(requestIdentity.ClientId))
-            {
-                return true;
-            }
-
-            if (_options.EndpointWhitelist != null && _options.EndpointWhitelist.Any())
-            {
-                if (_options.EndpointWhitelist.Any(x => $"{requestIdentity.HttpVerb}:{requestIdentity.Path}".ToLowerInvariant().Contains(x.ToLowerInvariant())) ||
-                    _options.EndpointWhitelist.Any(x => $"*:{requestIdentity.Path}".ToLowerInvariant().Contains(x.ToLowerInvariant())))
-                    return true;
-            }
-
-            return false;
-        }
-
-        public RateLimitResult ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
-        {
-            return _core.ProcessRequest(requestIdentity, rule);
-        }
-
-        public RateLimitHeaders GetRateLimitHeaders(RateLimitRule rule, RateLimitResult result)
-        {
-            return _core.GetRateLimitHeaders(rule, result);
+            return base.IsWhitelisted(requestIdentity);
         }
     }
 }

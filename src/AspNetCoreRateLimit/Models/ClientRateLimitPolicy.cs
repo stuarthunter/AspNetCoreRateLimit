@@ -1,10 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
     public class ClientRateLimitPolicy
     {
         public string ClientId { get; set; }
-        public List<RateLimitRule> Rules { get; set; }
+        public RateLimitRules Rules { get; set; }
     }
 }

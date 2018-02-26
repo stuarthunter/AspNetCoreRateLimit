@@ -1,6 +1,8 @@
-﻿namespace AspNetCoreRateLimit
+﻿using AspNetCoreRateLimit.Models;
+
+namespace AspNetCoreRateLimit
 {
-    public class ClientRateLimitOptions : RateLimitCoreOptions
+    public class ClientRateLimitOptions : RateLimitOptions
     {
         /// <summary>
         /// Gets or sets the HTTP header that holds the client identifier, by default is X-ClientId

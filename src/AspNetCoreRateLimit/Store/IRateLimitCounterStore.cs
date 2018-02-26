@@ -1,4 +1,6 @@
 ﻿
+using AspNetCoreRateLimit.Models;
+
 namespace AspNetCoreRateLimit
 {
     public interface IRateLimitCounterStore

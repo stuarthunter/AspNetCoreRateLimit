@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using System;
+using AspNetCoreRateLimit.Models;
 
 namespace AspNetCoreRateLimit
 {
@@ -24,14 +25,15 @@ namespace AspNetCoreRateLimit
                     counter = Get(id);
                     if (counter == null || counter.IsExpired)
                     {
-                        counter = new RateLimitCounter(rule.UseSlidingExpiration, rule.PeriodTimespan.Value);
-                        Set(id, counter, rule.PeriodTimespan.Value, rule.UseSlidingExpiration);
+                        var periodTimeSpan = rule.GetPeriodTimeSpan();
+                        counter = new RateLimitCounter(rule.UseSlidingExpiration, periodTimeSpan);
+                        Set(id, counter, periodTimeSpan, rule.UseSlidingExpiration);
 
                         return new RateLimitResult
                         {
                             Success = true,
                             Remaining = rule.Limit - 1,
-                            Expiry = DateTime.UtcNow.Add(rule.PeriodTimespan.Value)
+                            Expiry = DateTime.UtcNow.Add(periodTimeSpan)
                         };
                     }
                 }

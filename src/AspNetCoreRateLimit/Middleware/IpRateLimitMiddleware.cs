@@ -5,6 +5,8 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using AspNetCoreRateLimit.Core;
+using AspNetCoreRateLimit.Models;
 
 
 namespace AspNetCoreRateLimit
@@ -91,10 +93,10 @@ namespace AspNetCoreRateLimit
             if (result != null && !_options.DisableRateLimitHeaders)
             {
                 var rule = rules.Last();
-                var headers = _processor.GetRateLimitHeaders(rule, result);
+                var headers = GetRateLimitHeaders(rule, result);
                 headers.Context = httpContext;
 
-                httpContext.Response.OnStarting(SetRateLimitHeaders, state: headers);
+                httpContext.Response.OnStarting(SetRateLimitHeaders, headers);
             }
 
             await _next.Invoke(httpContext);
@@ -156,7 +158,7 @@ namespace AspNetCoreRateLimit
             _logger.LogInformation($"Request {identity.HttpVerb}:{identity.Path} from IP {identity.ClientIp} has been blocked, quota {rule.Limit}/{rule.Period} exceeded. Blocked by rule {rule.Endpoint}. TraceIdentifier {httpContext.TraceIdentifier}.");
         }
 
-        private Task SetRateLimitHeaders(object rateLimitHeaders)
+        private static Task SetRateLimitHeaders(object rateLimitHeaders)
         {
             var headers = (RateLimitHeaders)rateLimitHeaders;
 
@@ -165,6 +167,17 @@ namespace AspNetCoreRateLimit
             headers.Context.Response.Headers["X-Rate-Limit-Reset"] = headers.Reset;
 
             return Task.CompletedTask;
+        }
+
+        private static RateLimitHeaders GetRateLimitHeaders(RateLimitRule rule, RateLimitResult result)
+        {
+            var headers = new RateLimitHeaders
+            {
+                Reset = result.Expiry.ToString("o", DateTimeFormatInfo.InvariantInfo),
+                Limit = rule.Period,
+                Remaining = result.Remaining.ToString()
+            };
+            return headers;
         }
     }
 }

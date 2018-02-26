@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
     public class RateLimitRule
     {
@@ -19,16 +19,38 @@ namespace AspNetCoreRateLimit
         /// </summary>
         public string Period { get; set; }
 
-        public TimeSpan? PeriodTimespan { get; set; }
-
         /// <summary>
         /// Maximum number of requests that a client can make in a defined period
         /// </summary>
         public int Limit { get; set; }
 
         /// <summary>
-        /// Determines whether to use sliding expiration.  Not recommended for rules with high limits as individual request timestamps are stored.
+        /// Determines whether to use sliding expiration window for request counter.
         /// </summary>
         public bool UseSlidingExpiration { get; set; }
+
+        public TimeSpan GetPeriodTimeSpan()
+        {
+            if (string.IsNullOrEmpty(Period))
+            {
+                throw new FormatException("Period is empty.");
+            }
+
+            var l = Period.Length - 1;
+            if (l < 1 || !double.TryParse(Period.Substring(0, l), out var value) || value <= 0)
+            {
+                throw new FormatException($"Period '{Period}' can't be converted to TimeSpan.");
+            }
+
+            var type = Period.Substring(l, 1);
+            switch (type.ToLower())
+            {
+                case "d": return TimeSpan.FromDays(value);
+                case "h": return TimeSpan.FromHours(value);
+                case "m": return TimeSpan.FromMinutes(value);
+                case "s": return TimeSpan.FromSeconds(value);
+                default: throw new FormatException($"Perios '{Period}' can't be converted to TimeSpan.");
+            }
+        }
     }
 }

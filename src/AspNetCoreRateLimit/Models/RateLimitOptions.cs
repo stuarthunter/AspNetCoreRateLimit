@@ -1,10 +1,10 @@
 ﻿using System.Collections.Generic;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
-    public class RateLimitCoreOptions
+    public class RateLimitOptions
     {
-        public List<RateLimitRule> GeneralRules { get; set; }
+        public RateLimitRules GeneralRules { get; set; }
 
         public List<string> EndpointWhitelist { get; set; }
 
