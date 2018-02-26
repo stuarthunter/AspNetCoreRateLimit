@@ -3,7 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Net
 {
     /// <summary>
     /// IP v4 and v6 range helper by jsakamoto
@@ -23,13 +23,13 @@ namespace AspNetCoreRateLimit
 
         public IpAddressRange()
         {
-            this.Begin = new IPAddress(0L);
-            this.End = new IPAddress(0L);
+            Begin = new IPAddress(0L);
+            End = new IPAddress(0L);
         }
 
         public IpAddressRange(string ipRangeString)
         {
-            // remove all spaces.
+            // remove all spaces
             ipRangeString = ipRangeString.Replace(" ", "");
 
             // Pattern 1. CIDR range: "192.168.0.0/24", "fe80::/10"
@@ -39,8 +39,8 @@ namespace AspNetCoreRateLimit
                 var baseAdrBytes = IPAddress.Parse(m1.Groups["adr"].Value).GetAddressBytes();
                 var maskBytes = Bits.GetBitMask(baseAdrBytes.Length, int.Parse(m1.Groups["maskLen"].Value));
                 baseAdrBytes = Bits.And(baseAdrBytes, maskBytes);
-                this.Begin = new IPAddress(baseAdrBytes);
-                this.End = new IPAddress(Bits.Or(baseAdrBytes, Bits.Not(maskBytes)));
+                Begin = new IPAddress(baseAdrBytes);
+                End = new IPAddress(Bits.Or(baseAdrBytes, Bits.Not(maskBytes)));
                 return;
             }
 
@@ -48,7 +48,7 @@ namespace AspNetCoreRateLimit
             var m2 = Regex.Match(ipRangeString, @"^(?<adr>[\da-f\.:]+)$", RegexOptions.IgnoreCase);
             if (m2.Success)
             {
-                this.Begin = this.End = IPAddress.Parse(ipRangeString);
+                Begin = End = IPAddress.Parse(ipRangeString);
                 return;
             }
 
@@ -56,8 +56,8 @@ namespace AspNetCoreRateLimit
             var m3 = Regex.Match(ipRangeString, @"^(?<begin>[\da-f\.:]+)-(?<end>[\da-f\.:]+)$", RegexOptions.IgnoreCase);
             if (m3.Success)
             {
-                this.Begin = IPAddress.Parse(m3.Groups["begin"].Value);
-                this.End = IPAddress.Parse(m3.Groups["end"].Value);
+                Begin = IPAddress.Parse(m3.Groups["begin"].Value);
+                End = IPAddress.Parse(m3.Groups["end"].Value);
                 return;
             }
 
@@ -68,8 +68,8 @@ namespace AspNetCoreRateLimit
                 var baseAdrBytes = IPAddress.Parse(m4.Groups["adr"].Value).GetAddressBytes();
                 var maskBytes = IPAddress.Parse(m4.Groups["bitmask"].Value).GetAddressBytes();
                 baseAdrBytes = Bits.And(baseAdrBytes, maskBytes);
-                this.Begin = new IPAddress(baseAdrBytes);
-                this.End = new IPAddress(Bits.Or(baseAdrBytes, Bits.Not(maskBytes)));
+                Begin = new IPAddress(baseAdrBytes);
+                End = new IPAddress(Bits.Or(baseAdrBytes, Bits.Not(maskBytes)));
                 return;
             }
 
@@ -78,9 +78,14 @@ namespace AspNetCoreRateLimit
 
         public bool Contains(IPAddress ipaddress)
         {
-            if (ipaddress.AddressFamily != this.Begin.AddressFamily) return false;
+            if (ipaddress.AddressFamily != Begin.AddressFamily)
+            {
+                return false;
+            }
+
+
             var adrBytes = ipaddress.GetAddressBytes();
-            return Bits.GE(this.Begin.GetAddressBytes(), adrBytes) && Bits.LE(this.End.GetAddressBytes(), adrBytes);
+            return Bits.GE(Begin.GetAddressBytes(), adrBytes) && Bits.LE(End.GetAddressBytes(), adrBytes);
         }
     }
 

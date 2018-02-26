@@ -3,13 +3,13 @@ using System.Linq;
 using System.Net;
 using Microsoft.AspNetCore.Http;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Net
 {
-    public class ReversProxyIpParser : RemoteIpParser
+    public class ReverseProxyIpParser : RemoteIpParser
     {
         private readonly string _realIpHeader;
 
-        public ReversProxyIpParser(string realIpHeader)
+        public ReverseProxyIpParser(string realIpHeader)
         {
             _realIpHeader = realIpHeader;
         }

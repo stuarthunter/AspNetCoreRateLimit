@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using AspNetCoreRateLimit.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace AspNetCoreRateLimit.Core
 {
@@ -17,35 +18,51 @@ namespace AspNetCoreRateLimit.Core
             _counterStore = counterStore;
         }
 
-        public abstract string ComputeCounterKey(ClientRequestIdentity requestIdentity, RateLimitRule rule);
+        public abstract string ComputeCounterKey(ClientRequest clientRequest, RateLimitRule rule);
 
-        public abstract List<RateLimitRule> GetMatchingRules(ClientRequestIdentity identity);
+        public abstract List<RateLimitRule> GetMatchingRules(ClientRequest clientRequest);
 
-        public RateLimitResult ProcessRequest(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public RateLimitResult ProcessRequest(ClientRequest requestIdentity, RateLimitRule rule)
         {
             var key = ComputeCounterKey(requestIdentity, rule);
             var keyHash = ComputeKeyHash(key);
             return _counterStore.AddRequest(keyHash, rule);
         }
 
-        public virtual bool IsWhitelisted(ClientRequestIdentity requestIdentity)
+        public virtual ClientRequest GetClientRequest(HttpContext httpContext)
         {
-            if (_options.ClientWhitelist != null && _options.ClientWhitelist.Contains(requestIdentity.ClientId))
+            var clientId = "(anon)";
+            if (httpContext.Request.Headers.Keys.Contains(_options.ClientIdHeader, StringComparer.OrdinalIgnoreCase))
+            {
+                clientId = httpContext.Request.Headers[_options.ClientIdHeader].First();
+            }
+
+            return new ClientRequest
+            {
+                ClientId = clientId,
+                HttpVerb = httpContext.Request.Method.ToLower(),
+                Path = httpContext.Request.Path.ToString().ToLower()
+            };
+        }
+
+        public virtual bool IsWhitelisted(ClientRequest clientRequest)
+        {
+            if (_options.ClientWhitelist != null && _options.ClientWhitelist.Contains(clientRequest.ClientId))
             {
                 return true;
             }
 
             if (_options.EndpointWhitelist != null && _options.EndpointWhitelist.Any())
             {
-                if (_options.EndpointWhitelist.Any(x => $"{requestIdentity.HttpVerb}:{requestIdentity.Path}".StartsWith(x, StringComparison.OrdinalIgnoreCase))
-                    || _options.EndpointWhitelist.Any(x => $"*:{requestIdentity.Path}".StartsWith(x, StringComparison.OrdinalIgnoreCase)))
+                if (_options.EndpointWhitelist.Any(x => $"{clientRequest.HttpVerb}:{clientRequest.Path}".StartsWith(x, StringComparison.OrdinalIgnoreCase))
+                    || _options.EndpointWhitelist.Any(x => $"*:{clientRequest.Path}".StartsWith(x, StringComparison.OrdinalIgnoreCase)))
                     return true;
             }
 
             return false;
         }
 
-        public List<RateLimitRule> GetMatchingGeneralRules(ClientRequestIdentity identity)
+        public List<RateLimitRule> GetMatchingGeneralRules(ClientRequest clientRequest)
         {
             if (_options.GeneralRules == null)
             {
@@ -56,12 +73,12 @@ namespace AspNetCoreRateLimit.Core
 
             if (_options.EnableEndpointRateLimiting)
             {
-                var rules = _options.GeneralRules.GetEndpointRules(identity.HttpVerb, identity.Path);
+                var rules = _options.GeneralRules.GetEndpointRules(clientRequest.HttpVerb, clientRequest.Path);
                 result.AddRange(rules);
             }
             else
             {
-                var rules = _options.GeneralRules.GetGlobalRules(identity.HttpVerb);
+                var rules = _options.GeneralRules.GetGlobalRules(clientRequest.HttpVerb);
                 result.AddRange(rules);
             }
 

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
+﻿
 namespace AspNetCoreRateLimit.Models
 {
     public class ClientRateLimitPolicy

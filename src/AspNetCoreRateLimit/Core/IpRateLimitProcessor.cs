@@ -1,6 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using AspNetCoreRateLimit.Models;
+using AspNetCoreRateLimit.Net;
+using Microsoft.AspNetCore.Http;
 
 namespace AspNetCoreRateLimit.Core
 {
@@ -21,12 +24,12 @@ namespace AspNetCoreRateLimit.Core
             _ipParser = ipParser;
         }
 
-        public override string ComputeCounterKey(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public override string ComputeCounterKey(ClientRequest clientRequest, RateLimitRule rule)
         {
-            return $"{_options.RateLimitCounterPrefix}_{requestIdentity.ClientIp}_{rule.Period}_{rule.Endpoint}";
+            return $"{_options.RateLimitCounterPrefix}_{clientRequest.ClientIp}_{rule.Period}_{rule.Endpoint}";
         }
 
-        public override List<RateLimitRule> GetMatchingRules(ClientRequestIdentity identity)
+        public override List<RateLimitRule> GetMatchingRules(ClientRequest clientRequest)
         {
             var result = new List<RateLimitRule>();
 
@@ -35,7 +38,8 @@ namespace AspNetCoreRateLimit.Core
             if (policies?.IpRules != null && policies.IpRules.Any())
             {
                 // search for rules with IP intervals containing client IP
-                var matchPolicies = policies.IpRules.Where(x => _ipParser.ContainsIp(x.Ip, identity.ClientIp));
+                var clientIp = _ipParser.ParseIp(clientRequest.ClientIp);
+                var matchPolicies = policies.IpRules.Where(x => new IpAddressRange(x.Ip).Contains(clientIp));
                 var policyRules = new RateLimitRules();
                 foreach (var policy in matchPolicies)
                 {
@@ -44,12 +48,12 @@ namespace AspNetCoreRateLimit.Core
 
                 if (_options.EnableEndpointRateLimiting)
                 {
-                    var rules = policyRules.GetEndpointRules(identity.HttpVerb, identity.Path);
+                    var rules = policyRules.GetEndpointRules(clientRequest.HttpVerb, clientRequest.Path);
                     result.AddRange(rules);
                 }
                 else
                 {
-                    var rules = policyRules.GetGlobalRules(identity.HttpVerb);
+                    var rules = policyRules.GetGlobalRules(clientRequest.HttpVerb);
                     result.AddRange(rules);
                 }
 
@@ -60,7 +64,7 @@ namespace AspNetCoreRateLimit.Core
             }
 
             // add general rule if no specific client rule exists for period
-            var generalRules = GetMatchingGeneralRules(identity);
+            var generalRules = GetMatchingGeneralRules(clientRequest);
             if (generalRules != null && generalRules.Any())
             {
                 foreach (var limit in generalRules)
@@ -82,14 +86,39 @@ namespace AspNetCoreRateLimit.Core
             return result;
         }
 
-        public override bool IsWhitelisted(ClientRequestIdentity requestIdentity)
+        public override ClientRequest GetClientRequest(HttpContext httpContext)
         {
-            if (_options.IpWhitelist != null && _ipParser.ContainsIp(_options.IpWhitelist, requestIdentity.ClientIp))
+            var clientRequest = base.GetClientRequest(httpContext);
+
+            try
             {
-                return true;
+                var ip = _ipParser.GetClientIp(httpContext);
+                if (ip == null)
+                {
+                    throw new Exception("IpRateLimitMiddleware can't parse caller IP");
+                }
+                clientRequest.ClientIp = ip.ToString();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("IpRateLimitMiddleware can't parse caller IP", ex);
             }
 
-            return base.IsWhitelisted(requestIdentity);
+            return clientRequest;
+        }
+
+        public override bool IsWhitelisted(ClientRequest clientRequest)
+        {
+            if (_options.IpWhitelist != null)
+            {
+                var clientIp = _ipParser.ParseIp(clientRequest.ClientIp);
+                if (_options.IpWhitelist.Any(x => new IpAddressRange(x).Contains(clientIp)))
+                {
+                    return true;
+                }
+            }
+
+            return base.IsWhitelisted(clientRequest);
         }
     }
 }

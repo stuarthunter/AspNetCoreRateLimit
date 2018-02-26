@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
     public class RateLimitResult
     {

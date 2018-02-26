@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
+﻿using AspNetCoreRateLimit.Models;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 

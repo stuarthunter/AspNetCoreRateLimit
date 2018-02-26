@@ -18,27 +18,27 @@ namespace AspNetCoreRateLimit.Core
             _policyStore = policyStore;
         }
 
-        public override string ComputeCounterKey(ClientRequestIdentity requestIdentity, RateLimitRule rule)
+        public override string ComputeCounterKey(ClientRequest clientRequest, RateLimitRule rule)
         {
-            return $"{_options.RateLimitCounterPrefix}_{requestIdentity.ClientId}_{rule.Period}_{rule.Endpoint}";
+            return $"{_options.RateLimitCounterPrefix}_{clientRequest.ClientId}_{rule.Period}_{rule.Endpoint}";
         }
 
-        public override List<RateLimitRule> GetMatchingRules(ClientRequestIdentity identity)
+        public override List<RateLimitRule> GetMatchingRules(ClientRequest clientRequest)
         {
             var result = new List<RateLimitRule>();
 
             // get matching client rules
-            var policy = _policyStore.Get($"{_options.ClientPolicyPrefix}_{identity.ClientId}");
+            var policy = _policyStore.Get($"{_options.ClientPolicyPrefix}_{clientRequest.ClientId}");
             if (policy?.Rules != null && policy.Rules.Any())
             {
                 if (_options.EnableEndpointRateLimiting)
                 {
-                    var rules = policy.Rules.GetEndpointRules(identity.HttpVerb, identity.Path);
+                    var rules = policy.Rules.GetEndpointRules(clientRequest.HttpVerb, clientRequest.Path);
                     result.AddRange(rules);
                 }
                 else
                 {
-                    var rules = policy.Rules.GetGlobalRules(identity.HttpVerb);
+                    var rules = policy.Rules.GetGlobalRules(clientRequest.HttpVerb);
                     result.AddRange(rules);
                 }
 
@@ -49,7 +49,7 @@ namespace AspNetCoreRateLimit.Core
             }
 
             // add general rule if no specific client rule exists for period
-            var generalRules = GetMatchingGeneralRules(identity);
+            var generalRules = GetMatchingGeneralRules(clientRequest);
             if (generalRules != null && generalRules.Any())
             {
                 foreach (var limit in generalRules)

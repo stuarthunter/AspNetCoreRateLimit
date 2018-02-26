@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
     /// <summary>
     /// Stores the initial access time and the numbers of calls made from that point

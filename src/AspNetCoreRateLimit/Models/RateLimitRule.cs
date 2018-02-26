@@ -25,7 +25,7 @@ namespace AspNetCoreRateLimit.Models
         public int Limit { get; set; }
 
         /// <summary>
-        /// Determines whether to use sliding expiration window for request counter.
+        /// Determines whether to use sliding expiration window for request counter
         /// </summary>
         public bool UseSlidingExpiration { get; set; }
 

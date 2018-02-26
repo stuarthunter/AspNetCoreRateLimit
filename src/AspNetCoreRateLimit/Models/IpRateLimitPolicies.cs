@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
     public class IpRateLimitPolicies
     {

@@ -1,34 +1,40 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Linq;
 using System.Net;
 using Microsoft.AspNetCore.Http;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Net
 {
     public class RemoteIpParser : IIpAddressParser
     {
-        public bool ContainsIp(string ipRule, string clientIp)
+        public IPAddress ParseIp(string ipAddress)
         {
-            return IpAddressUtil.ContainsIp(ipRule, clientIp);
-        }
+            // use first IP address
+            var target = ipAddress.Split(',').First().Trim();
 
-        public bool ContainsIp(List<string> ipRules, string clientIp)
-        {
-            return IpAddressUtil.ContainsIp(ipRules, clientIp);
-        }
+            // handle IPV4
+            var parts = target.Split(':');
+            if (parts.Length <= 2)
+            {
+                return IPAddress.Parse(parts[0]);
+            }
 
-        public bool ContainsIp(List<string> ipRules, string clientIp, out string rule)
-        {
-            return IpAddressUtil.ContainsIp(ipRules, clientIp, out rule);
+            // handle IPV6
+            if (target.StartsWith("["))
+            {
+                var end = target.IndexOf("]", StringComparison.OrdinalIgnoreCase);
+                if (end > 0)
+                {
+                    return IPAddress.Parse(target.Substring(0, end + 1));
+                }
+            }
+
+            return IPAddress.Parse(target);
         }
 
         public virtual IPAddress GetClientIp(HttpContext context)
         {
             return context.Connection.RemoteIpAddress;
-        }
-
-        public IPAddress ParseIp(string ipAddress)
-        {
-            return IpAddressUtil.ParseIp(ipAddress);
         }
     }
 }

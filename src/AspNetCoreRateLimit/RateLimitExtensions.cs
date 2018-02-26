@@ -2,7 +2,7 @@
 
 namespace AspNetCoreRateLimit
 {
-    public static class MiddlewareExtensions
+    public static class RateLimitExtensions
     {
         public static IApplicationBuilder UseIpRateLimiting(this IApplicationBuilder builder)
         {
@@ -13,7 +13,5 @@ namespace AspNetCoreRateLimit
         {
             return builder.UseMiddleware<ClientRateLimitMiddleware>();
         }
-
-       
     }
 }

@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
     public class RateLimitHeaders
     {

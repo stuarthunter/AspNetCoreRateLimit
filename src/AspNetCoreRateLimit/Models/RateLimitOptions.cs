@@ -4,6 +4,11 @@ namespace AspNetCoreRateLimit.Models
 {
     public class RateLimitOptions
     {
+        /// <summary>
+        /// Gets or sets the HTTP header that holds the client identifier, by default is X-ClientId
+        /// </summary>
+        public string ClientIdHeader { get; set; } = "X-ClientId";
+
         public RateLimitRules GeneralRules { get; set; }
 
         public List<string> EndpointWhitelist { get; set; }
@@ -28,7 +33,7 @@ namespace AspNetCoreRateLimit.Models
         public string RateLimitCounterPrefix { get; set; } = "crlc";
 
         /// <summary>
-        /// Gets or sets a value indicating whether all requests, including the rejected ones, should be stacked in this order: day, hour, min, sec
+        /// Gets or sets a value indicating whether requests should be stacked in this order: day, hour, min, sec
         /// </summary>
         public bool StackBlockedRequests { get; set; }
 

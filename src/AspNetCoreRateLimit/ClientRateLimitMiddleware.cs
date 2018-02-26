@@ -13,9 +13,9 @@ namespace AspNetCoreRateLimit
     public class ClientRateLimitMiddleware
     {
         private readonly RequestDelegate _next;
+        private readonly ClientRateLimitOptions _options;
         private readonly ILogger<ClientRateLimitMiddleware> _logger;
         private readonly ClientRateLimitProcessor _processor;
-        private readonly ClientRateLimitOptions _options;
 
         public ClientRateLimitMiddleware(RequestDelegate next,
             IOptions<ClientRateLimitOptions> options,
@@ -27,7 +27,6 @@ namespace AspNetCoreRateLimit
             _next = next;
             _options = options.Value;
             _logger = logger;
-
             _processor = new ClientRateLimitProcessor(_options, counterStore, policyStore);
         }
 
@@ -40,34 +39,33 @@ namespace AspNetCoreRateLimit
                 return;
             }
 
-            // compute identity from request
-            var identity = SetIdentity(httpContext);
+            // get request details
+            var clientRequest = _processor.GetClientRequest(httpContext);
 
             // check white list
-            if (_processor.IsWhitelisted(identity))
+            if (_processor.IsWhitelisted(clientRequest))
             {
                 await _next.Invoke(httpContext);
                 return;
             }
 
-            var rules = _processor.GetMatchingRules(identity);
+            var rules = _processor.GetMatchingRules(clientRequest);
             RateLimitResult result = null;
-
             foreach (var rule in rules)
             {
                 // if limit is zero or less, block the request.
                 if (rule.Limit <= 0)
                 {
                     // log blocked request
-                    LogBlockedRequest(httpContext, identity, rule);
+                    LogBlockedRequest(httpContext, clientRequest, rule);
 
-                    // break execution
+                    // return quote exceeded
                     await ReturnQuotaExceededResponse(httpContext, rule);
                     return;
                 }
 
                 // process request
-                result = _processor.ProcessRequest(identity, rule);
+                result = _processor.ProcessRequest(clientRequest, rule);
 
                 // check if limit is exceeded
                 if (!result.Success)
@@ -76,49 +74,50 @@ namespace AspNetCoreRateLimit
                     var retryAfter = Convert.ToInt32((result.Expiry - DateTime.UtcNow).TotalSeconds).ToString(CultureInfo.InvariantCulture);
 
                     // log blocked request
-                    LogBlockedRequest(httpContext, identity, rule);
+                    LogBlockedRequest(httpContext, clientRequest, rule);
 
-                    // break execution
+                    // return quote exceeded
                     await ReturnQuotaExceededResponse(httpContext, rule, retryAfter);
                     return;
                 }
             }
 
-            //set X-Rate-Limit headers for the longest period
+            // set X-Rate-Limit headers
             if(result != null && !_options.DisableRateLimitHeaders)
             {
                 var rule = rules.Last();
-                var headers = GetRateLimitHeaders(rule, result);
-                headers.Context = httpContext;
+                var headers = new RateLimitHeaders
+                {
+                    Reset = result.Expiry.ToString("o", DateTimeFormatInfo.InvariantInfo),
+                    Limit = rule.Period,
+                    Remaining = result.Remaining.ToString()
+                };
 
-                httpContext.Response.OnStarting(SetRateLimitHeaders, headers);
+                httpContext.Response.OnStarting(state => {
+                    try
+                    {
+                        var context = (HttpContext) state;
+                        context.Response.Headers["X-Rate-Limit-Limit"] = headers.Limit;
+                        context.Response.Headers["X-Rate-Limit-Remaining"] = headers.Remaining;
+                        context.Response.Headers["X-Rate-Limit-Reset"] = headers.Reset;
+                    }
+                    catch
+                    {
+                        // ignore exception adding headers
+                    }
+                    return Task.FromResult(0);
+                }, httpContext);
             }
 
             await _next.Invoke(httpContext);
         }
 
-        public virtual ClientRequestIdentity SetIdentity(HttpContext httpContext)
-        {
-            var clientId = "anon";
-            if (httpContext.Request.Headers.Keys.Contains(_options.ClientIdHeader,StringComparer.CurrentCultureIgnoreCase))
-            {
-                clientId = httpContext.Request.Headers[_options.ClientIdHeader].First();
-            }
-
-            return new ClientRequestIdentity
-            {
-                Path = httpContext.Request.Path.ToString().ToLowerInvariant(),
-                HttpVerb = httpContext.Request.Method.ToLowerInvariant(),
-                ClientId = clientId
-            };
-        }
-
-        public virtual Task ReturnQuotaExceededResponse(HttpContext httpContext, RateLimitRule rule)
+        private Task ReturnQuotaExceededResponse(HttpContext httpContext, RateLimitRule rule)
         {
             return ReturnQuotaExceededResponse(httpContext, rule, null);
         }
 
-        public virtual Task ReturnQuotaExceededResponse(HttpContext httpContext, RateLimitRule rule, string retryAfter)
+        private Task ReturnQuotaExceededResponse(HttpContext httpContext, RateLimitRule rule, string retryAfter)
         {
             var message = string.IsNullOrEmpty(_options.QuotaExceededMessage) ? $"API calls quota exceeded! Maximum admitted {rule.Limit} per {rule.Period}." : _options.QuotaExceededMessage;
 
@@ -131,31 +130,9 @@ namespace AspNetCoreRateLimit
             return httpContext.Response.WriteAsync(message);
         }
 
-        public virtual void LogBlockedRequest(HttpContext httpContext, ClientRequestIdentity identity, RateLimitRule rule)
+        private void LogBlockedRequest(HttpContext httpContext, ClientRequest identity, RateLimitRule rule)
         {
             _logger.LogInformation($"Request {identity.HttpVerb}:{identity.Path} from ClientId {identity.ClientId} has been blocked, quota {rule.Limit}/{rule.Period} exceeded. Blocked by rule {rule.Endpoint}. TraceIdentifier {httpContext.TraceIdentifier}.");
-        }
-
-        private static Task SetRateLimitHeaders(object rateLimitHeaders)
-        {
-            var headers = (RateLimitHeaders) rateLimitHeaders;
-
-            headers.Context.Response.Headers["X-Rate-Limit-Limit"] = headers.Limit;
-            headers.Context.Response.Headers["X-Rate-Limit-Remaining"] = headers.Remaining;
-            headers.Context.Response.Headers["X-Rate-Limit-Reset"] = headers.Reset;
-
-            return Task.CompletedTask;
-        }
-
-        private static RateLimitHeaders GetRateLimitHeaders(RateLimitRule rule, RateLimitResult result)
-        {
-            var headers = new RateLimitHeaders
-            {
-                Reset = result.Expiry.ToString("o", DateTimeFormatInfo.InvariantInfo),
-                Limit = rule.Period,
-                Remaining = result.Remaining.ToString()
-            };
-            return headers;
         }
     }
 }

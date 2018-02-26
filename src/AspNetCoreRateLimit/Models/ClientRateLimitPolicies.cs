@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
-using AspNetCoreRateLimit.Models;
 
-namespace AspNetCoreRateLimit
+namespace AspNetCoreRateLimit.Models
 {
     public class ClientRateLimitPolicies
     {
