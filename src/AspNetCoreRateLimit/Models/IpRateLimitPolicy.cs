@@ -7,19 +7,18 @@ namespace AspNetCoreRateLimit.Models
     public class IpRateLimitPolicy
     {
         private string _ip;
-        private Lazy<IpAddressRange> _ipAddressRange;
-
+        
         public string Ip
         {
             get => _ip;
             set
             {
                 _ip = value;
-                _ipAddressRange = new Lazy<IpAddressRange>(() => new IpAddressRange(_ip));
+                IpAddressRange = new IpAddressRange(_ip);
             }
         }
 
-        public IpAddressRange IpAddressRange => _ipAddressRange.Value;
+        public IpAddressRange IpAddressRange { get; private set; }
 
         public List<RateLimitRule> Rules { get; set; }
     }

@@ -24,15 +24,14 @@ namespace AspNetCoreRateLimit.Store
             var counter = Get(id);
             if (counter == null)
             {
-                var periodTimeSpan = rule.GetPeriodTimeSpan();
-                counter = new RateLimitCounter(rule.UseSlidingExpiration, periodTimeSpan);
-                Set(id, counter, periodTimeSpan, rule.UseSlidingExpiration);
+                counter = new RateLimitCounter(rule.UseSlidingExpiration, rule.PeriodTimeSpan);
+                Set(id, counter, rule.PeriodTimeSpan, rule.UseSlidingExpiration);
 
                 return new RateLimitResult
                 {
                     Success = true,
                     Remaining = rule.Limit - 1,
-                    Expiry = DateTime.UtcNow.Add(periodTimeSpan)
+                    Expiry = DateTime.UtcNow.Add(rule.PeriodTimeSpan)
                 };
             }
 

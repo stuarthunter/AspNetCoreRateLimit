@@ -52,7 +52,7 @@ namespace AspNetCoreRateLimit.Core
             }
 
             // order by period
-            result = result.OrderBy(x => x.GetPeriodTimeSpan()).ToList();
+            result = result.OrderBy(x => x.PeriodTimeSpan).ToList();
             if (_options.StackBlockedRequests)
             {
                 result.Reverse();
