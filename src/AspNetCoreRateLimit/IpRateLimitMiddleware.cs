@@ -44,6 +44,15 @@ namespace AspNetCoreRateLimit
             // get request details
             var identity = _processor.GetClientRequest(httpContext);
 
+            // check that we have client IP adress
+            if (string.IsNullOrEmpty(identity.ClientIp))
+            {
+                // TODO: log failure to identity client IP 
+
+                await _next.Invoke(httpContext);
+                return;
+            }
+
             // check white list
             if (_processor.IsWhitelisted(identity))
             {

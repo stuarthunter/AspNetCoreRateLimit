@@ -14,7 +14,7 @@ namespace AspNetCoreRateLimit.Store
         {
             _memoryCache = memoryCache;
 
-            //save ip rules defined in appsettings in cache on startup
+            // save IP rules defined in appsettings in cache on startup
             if (options?.Value != null && policies?.Value?.IpRules != null)
             {
                 Set($"{options.Value.IpPolicyPrefix}", policies.Value);

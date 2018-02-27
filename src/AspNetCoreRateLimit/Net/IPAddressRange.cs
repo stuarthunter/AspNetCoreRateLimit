@@ -73,7 +73,7 @@ namespace AspNetCoreRateLimit.Net
                 return;
             }
 
-            throw new FormatException("Unknown IP range string.");
+            throw new FormatException($"Unsupported IP range string: {ipRangeString}");
         }
 
         public bool Contains(IPAddress ipaddress)

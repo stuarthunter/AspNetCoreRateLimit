@@ -15,11 +15,10 @@ namespace AspNetCoreRateLimit.Store
         {
             _memoryCache = memoryCache;
 
-            //save ip rules defined in appsettings in distributed cache on startup
+            // save IP rules defined in appsettings in distributed cache on startup
             if (options?.Value != null && policies?.Value?.IpRules != null)
             {
                 Set($"{options.Value.IpPolicyPrefix}", policies.Value);
-
             }
         }
 
@@ -39,6 +38,7 @@ namespace AspNetCoreRateLimit.Store
             // TODO: REQUIRES REVIEW 
             // No need to fetch from remote store for every request
             // Cache locally for 1 min?
+            // IpAddressRange not persisted
 
             var stored = _memoryCache.GetString(id);
             if (!string.IsNullOrEmpty(stored))

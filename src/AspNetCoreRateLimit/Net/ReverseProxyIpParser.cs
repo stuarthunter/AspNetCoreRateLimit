@@ -18,6 +18,7 @@ namespace AspNetCoreRateLimit.Net
         {
             if (context.Request.Headers.Keys.Contains(_realIpHeader, StringComparer.CurrentCultureIgnoreCase))
             {
+                // TODO: REVIEW - if using X-Forwarded-For then first value is the real IP but can be spoofed by user
                 return ParseIp(context.Request.Headers[_realIpHeader].Last());
             }
 

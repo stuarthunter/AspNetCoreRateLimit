@@ -13,6 +13,7 @@ namespace AspNetCoreRateLimit.Core
         private readonly IpRateLimitOptions _options;
         private readonly IIpPolicyStore _policyStore;
         private readonly IIpAddressParser _ipParser;
+        private readonly List<IpAddressRange> _ipAddressRangeWhitelist;
 
         public IpRateLimitProcessor(IpRateLimitOptions options,
             IRateLimitCounterStore counterStore,
@@ -23,6 +24,12 @@ namespace AspNetCoreRateLimit.Core
             _options = options;
             _policyStore = policyStore;
             _ipParser = ipParser;
+
+            // parse IP whitelist
+            if (_options.IpWhitelist != null)
+            {
+                _ipAddressRangeWhitelist = _options.IpWhitelist.Select(x => new IpAddressRange(x)).ToList();
+            }
         }
 
         public override string ComputeCounterKey(ClientRequest clientRequest, RateLimitRule rule)
@@ -40,7 +47,7 @@ namespace AspNetCoreRateLimit.Core
             {
                 // search for rules with IP intervals containing client IP
                 var clientIp = _ipParser.ParseIp(clientRequest.ClientIp);
-                var matchPolicies = policies.IpRules.Where(x => new IpAddressRange(x.Ip).Contains(clientIp));
+                var matchPolicies = policies.IpRules.Where(x => x.IpAddressRange.Contains(clientIp));
                 var policyRules = new RateLimitRules();
                 foreach (var policy in matchPolicies)
                 {
@@ -91,18 +98,10 @@ namespace AspNetCoreRateLimit.Core
         {
             var clientRequest = base.GetClientRequest(httpContext);
 
-            try
+            var clientIp = _ipParser.GetClientIp(httpContext);
+            if (clientIp != null)
             {
-                var ip = _ipParser.GetClientIp(httpContext);
-                if (ip == null)
-                {
-                    throw new Exception("IpRateLimitMiddleware can't parse caller IP");
-                }
-                clientRequest.ClientIp = ip.ToString();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("IpRateLimitMiddleware can't parse caller IP", ex);
+                clientRequest.ClientIp = clientIp.ToString();
             }
 
             return clientRequest;
@@ -110,16 +109,21 @@ namespace AspNetCoreRateLimit.Core
 
         public override bool IsWhitelisted(ClientRequest clientRequest)
         {
-            if (_options.IpWhitelist != null)
+            if (base.IsWhitelisted(clientRequest))
+            {
+                return true;
+            }
+
+            if (_ipAddressRangeWhitelist != null)
             {
                 var clientIp = _ipParser.ParseIp(clientRequest.ClientIp);
-                if (_options.IpWhitelist.Any(x => new IpAddressRange(x).Contains(clientIp)))
+                if (_ipAddressRangeWhitelist.Any(x => x.Contains(clientIp)))
                 {
                     return true;
                 }
             }
 
-            return base.IsWhitelisted(clientRequest);
+            return false;
         }
     }
 }

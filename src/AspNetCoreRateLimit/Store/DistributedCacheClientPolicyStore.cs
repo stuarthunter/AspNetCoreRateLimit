@@ -15,12 +15,17 @@ namespace AspNetCoreRateLimit.Store
         {
             _memoryCache = memoryCache;
 
-            //save client rules defined in appsettings in distributed cache on startup
+            // save client rules defined in appsettings in distributed cache on startup
             if (options?.Value != null && policies?.Value?.ClientRules != null)
             {
                 foreach (var rule in policies.Value.ClientRules)
                 {
-                    Set($"{options.Value.ClientPolicyPrefix}_{rule.ClientId}", new ClientRateLimitPolicy { ClientId = rule.ClientId, Rules = rule.Rules });
+                    Set($"{options.Value.ClientPolicyPrefix}_{rule.ClientId}",
+                        new ClientRateLimitPolicy
+                        {
+                            ClientId = rule.ClientId,
+                            Rules = rule.Rules
+                        });
                 }
             }
         }
