@@ -27,6 +27,7 @@ namespace AspNetCoreRateLimit.Core
         public override List<RateLimitRule> GetMatchingRules(ClientRequest clientRequest)
         {
             var result = new List<RateLimitRule>();
+            var rulePeriodComparer = new RateLimitRule.PeriodComparer();
 
             // get matching client rules
             var policy = _policyStore.Get($"{_options.ClientPolicyPrefix}_{clientRequest.ClientId}");
@@ -34,34 +35,22 @@ namespace AspNetCoreRateLimit.Core
             {
                 if (_options.EnableEndpointRateLimiting)
                 {
-                    var rules = policy.Rules.GetEndpointRules(clientRequest.HttpVerb, clientRequest.Path);
-                    result.AddRange(rules);
-                }
-                else
-                {
-                    var rules = policy.Rules.GetGlobalRules(clientRequest.HttpVerb);
-                    result.AddRange(rules);
+                    var endpointRules = policy.Rules.GetEndpointRules(clientRequest.HttpVerb, clientRequest.Path);
+                    result.AddRange(endpointRules);
                 }
 
-                // get the most restrictive limit for each period 
-                result = result.GroupBy(x => x.Period)
-                    .Select(x => x.OrderBy(y => y.Limit).ThenBy(y => y.Endpoint.Length).First())
-                    .ToList();
+                // add client specific global rules where no rule exists for period
+                var globalRules = policy.Rules.GetGlobalRules(clientRequest.HttpVerb);
+                result.AddRange(globalRules.Except(result, rulePeriodComparer));
             }
 
-            // add general rule if no specific client rule exists for period
+            // add general rules where no rule exists for period
             var generalRules = GetMatchingGeneralRules(clientRequest);
-            if (generalRules != null && generalRules.Any())
+            if (generalRules != null)
             {
-                foreach (var limit in generalRules)
-                {
-                    if (!result.Exists(x => x.Period == limit.Period))
-                    {
-                        result.Add(limit);
-                    }
-                }
+                result.AddRange(generalRules.Except(result, rulePeriodComparer));
             }
-            
+
             // order by period
             result = result.OrderBy(x => x.GetPeriodTimeSpan()).ToList();
             if (_options.StackBlockedRequests)

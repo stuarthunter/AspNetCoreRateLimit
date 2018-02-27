@@ -65,28 +65,22 @@ namespace AspNetCoreRateLimit.Core
 
         public List<RateLimitRule> GetMatchingGeneralRules(ClientRequest clientRequest)
         {
-            if (_options.GeneralRules == null)
+            if (_options.GeneralRules == null || !_options.GeneralRules.Any())
             {
                 return null;
             }
 
             var result = new List<RateLimitRule>();
+            var rulePeriodComparer = new RateLimitRule.PeriodComparer();
 
             if (_options.EnableEndpointRateLimiting)
             {
-                var rules = _options.GeneralRules.GetEndpointRules(clientRequest.HttpVerb, clientRequest.Path);
-                result.AddRange(rules);
-            }
-            else
-            {
-                var rules = _options.GeneralRules.GetGlobalRules(clientRequest.HttpVerb);
-                result.AddRange(rules);
+                var endpointRules = _options.GeneralRules.GetEndpointRules(clientRequest.HttpVerb, clientRequest.Path);
+                result.AddRange(endpointRules);
             }
 
-            // get the most restrictive limit for each period 
-            result = result.GroupBy(x => x.Period)
-                .Select(x => x.OrderBy(y => y.Limit).ThenBy(y => y.Endpoint.Length).First())
-                .ToList();
+            var globalRules = _options.GeneralRules.GetGlobalRules(clientRequest.HttpVerb);
+            result.AddRange(globalRules.Except(result, rulePeriodComparer));
 
             return result;
         }

@@ -1,9 +1,35 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace AspNetCoreRateLimit.Models
 {
     public class RateLimitRule
     {
+        public class PeriodComparer : IEqualityComparer<RateLimitRule>
+        {
+            public bool Equals(RateLimitRule x, RateLimitRule y)
+            {
+                if (x == null || y == null)
+                {
+                    return false;
+                }
+
+                if (x.Period == null)
+                {
+                    return y.Period == null;
+                }
+
+                return x.Period.Equals(y.Period);
+            }
+
+            public int GetHashCode(RateLimitRule obj)
+            {
+                return obj.Period == null 
+                    ? 0 
+                    : obj.Period.GetHashCode();
+            }
+        }
+
         /// <summary>
         /// HTTP verb and path 
         /// </summary>
