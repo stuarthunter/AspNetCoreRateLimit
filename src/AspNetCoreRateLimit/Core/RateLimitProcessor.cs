@@ -84,7 +84,9 @@ namespace AspNetCoreRateLimit.Core
             }
 
             // get the most restrictive limit for each period 
-            result = result.GroupBy(x => x.Period).Select(x => x.OrderBy(y => y.Limit).First()).ToList();
+            result = result.GroupBy(x => x.Period)
+                .Select(x => x.OrderBy(y => y.Limit).ThenBy(y => y.Endpoint.Length).First())
+                .ToList();
 
             return result;
         }
