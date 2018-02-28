@@ -36,7 +36,7 @@ namespace AspNetCoreRateLimit.Store
         public IpRateLimitPolicies Get(string id)
         {
             // TODO: REQUIRES REVIEW 
-            // No need to fetch from remote store for every request
+            // No need to fetch from remote remote store for every request
             // Cache locally for 1 min?
             // IpAddressRange not persisted
 

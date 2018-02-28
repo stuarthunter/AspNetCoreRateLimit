@@ -19,7 +19,7 @@ namespace AspNetCoreRateLimit.Models
 
         private readonly object _lock = new object();
 
-        private const int TICK_ADJ = 1000000;
+        private const int TickAdj = 10000; // store timestamps with millisecond accuracy
 
         public RateLimitCounter(bool useSlidingExpiration, TimeSpan period)
         {
@@ -29,7 +29,7 @@ namespace AspNetCoreRateLimit.Models
             if (_useSlidingExpiration)
             {
                 _requests = new ConcurrentQueue<int>();
-                _requests.Enqueue((int) DateTime.UtcNow.Ticks / TICK_ADJ);
+                _requests.Enqueue((int) DateTime.UtcNow.Ticks / TickAdj);
             }
             else
             {
@@ -61,7 +61,7 @@ namespace AspNetCoreRateLimit.Models
             if (_useSlidingExpiration)
             {
                 // remove expired requests
-                var minTimestamp = DateTime.UtcNow.Subtract(_period).Ticks / TICK_ADJ;
+                var minTimestamp = DateTime.UtcNow.Subtract(_period).Ticks / TickAdj;
                 
                 if (_requests.TryPeek(out var timestamp) && timestamp <= minTimestamp)
                 {
@@ -77,7 +77,7 @@ namespace AspNetCoreRateLimit.Models
                 count = _requests.Count;
                 // calculate expiry from timestamp of first request inside period
                 expiry = timestamp > 0 
-                    ? new DateTime(timestamp * TICK_ADJ).ToUniversalTime().Add(_period) 
+                    ? new DateTime(timestamp * TickAdj).ToUniversalTime().Add(_period) 
                     : DateTime.UtcNow.Add(_period);
             }
             else
@@ -101,7 +101,7 @@ namespace AspNetCoreRateLimit.Models
             // add request
             if (_useSlidingExpiration)
             {
-                _requests.Enqueue((int) DateTime.UtcNow.Ticks / TICK_ADJ);
+                _requests.Enqueue((int) DateTime.UtcNow.Ticks / TickAdj);
             }
             else
             {

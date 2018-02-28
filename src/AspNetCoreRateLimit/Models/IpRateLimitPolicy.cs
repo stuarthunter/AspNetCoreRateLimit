@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using AspNetCoreRateLimit.Net;
+using Newtonsoft.Json;
 
 namespace AspNetCoreRateLimit.Models
 {
@@ -18,6 +19,7 @@ namespace AspNetCoreRateLimit.Models
             }
         }
 
+        [JsonIgnore]
         public IpAddressRange IpAddressRange { get; private set; }
 
         public List<RateLimitRule> Rules { get; set; }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace AspNetCoreRateLimit.Models
 {
@@ -58,6 +59,7 @@ namespace AspNetCoreRateLimit.Models
         /// <summary>
         /// Rate limit period (read-only)
         /// </summary>
+        [JsonIgnore]
         public TimeSpan PeriodTimeSpan { get; private set; }
 
         /// <summary>
@@ -90,7 +92,7 @@ namespace AspNetCoreRateLimit.Models
                 case "h": return TimeSpan.FromHours(value);
                 case "m": return TimeSpan.FromMinutes(value);
                 case "s": return TimeSpan.FromSeconds(value);
-                default: throw new FormatException($"Perios '{period}' can't be converted to TimeSpan.");
+                default: throw new FormatException($"Period '{period}' can't be converted to TimeSpan.");
             }
         }
     }
