@@ -26,8 +26,8 @@ namespace AspNetCoreRateLimit.Core
         public RateLimitResult ProcessRequest(ClientRequest requestIdentity, RateLimitRule rule)
         {
             var key = ComputeCounterKey(requestIdentity, rule);
-            var keyHash = ComputeKeyHash(key);
-            return _counterStore.AddRequest(keyHash, rule);
+            //var keyHash = ComputeKeyHash(key);
+            return _counterStore.AddRequest(key, rule);
         }
 
         public virtual ClientRequest GetClientRequest(HttpContext httpContext)

@@ -21,7 +21,7 @@ namespace AspNetCoreRateLimit.Core
 
         public override string ComputeCounterKey(ClientRequest clientRequest, RateLimitRule rule)
         {
-            return $"{_options.RateLimitCounterPrefix}_{clientRequest.ClientId}_{rule.Period}_{rule.Endpoint}";
+            return $"{_options.RateLimitCounterPrefix}_{clientRequest.ClientId}_{rule.Period}{(rule.UseSlidingExpiration ? "*" : "")}_{rule.Endpoint}";
         }
 
         public override List<RateLimitRule> GetMatchingRules(ClientRequest clientRequest)
