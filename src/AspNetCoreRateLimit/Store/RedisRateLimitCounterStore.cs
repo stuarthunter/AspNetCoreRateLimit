@@ -1,8 +1,8 @@
 ﻿// Lua scripting reference: https://www.redisgreen.net/blog/intro-to-lua-for-redis-programmers/
 
 using System;
-using System.Linq;
 using System.Threading.Tasks;
+using AspNetCoreRateLimit.Helpers;
 using AspNetCoreRateLimit.Models;
 using StackExchange.Redis;
 
@@ -38,30 +38,24 @@ namespace AspNetCoreRateLimit.Store
             return count .. ':' .. minScore
             ";
 
-        private static readonly Lazy<LoadedLuaScript> LoadedIncrementScript = new Lazy<LoadedLuaScript>(() => LoadScript(IncrementScript));
-        private static readonly Lazy<LoadedLuaScript> LoadedIncrementScriptSliding = new Lazy<LoadedLuaScript>(() => LoadScript(IncrementScriptSliding));
+        private readonly RedisConnection _connection;
 
-        // todo: inject singleton Redis ConnectionMultiplexer via DI instead of using lazy static reference
-        private static Lazy<ConnectionMultiplexer> _redis;
-
-        public RedisRateLimitCounterStore(string connectionString)
+        public RedisRateLimitCounterStore(RedisConnection connection)
         {
-            if (_redis == null)
-            {
-                _redis = new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(connectionString));
-            }
+            _connection = connection;
+            _connection.RegisterScript("INCREMENT", IncrementScript);
+            _connection.RegisterScript("INCREMENT_SLIDING", IncrementScriptSliding);
         }
 
         public async Task<RateLimitResult> AddRequestAsync(string id, RateLimitRule rule)
         {
-            var db = _redis.Value.GetDatabase();
             var key = $"RATELIMIT::{id}";
             int count;
             DateTime expiry;
 
             if (!rule.UseSlidingExpiration)
             {
-                var result = await LoadedIncrementScript.Value.EvaluateAsync(db, new
+                var result = await _connection.ExecuteScriptAsync("INCREMENT", new
                 {
                     key = (RedisKey) key,
                     ttl = (int) rule.PeriodTimeSpan.TotalSeconds
@@ -73,7 +67,7 @@ namespace AspNetCoreRateLimit.Store
             }
             else
             {
-                var result = await LoadedIncrementScriptSliding.Value.EvaluateAsync(db, new
+                var result = await _connection.ExecuteScriptAsync("INCREMENT_SLIDING", new
                 {
                     key = (RedisKey) key,
                     timestamp = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond,
@@ -94,21 +88,6 @@ namespace AspNetCoreRateLimit.Store
                 Remaining = count <= rule.Limit ? 0 : rule.Limit - count,
                 Expiry = expiry
             };
-        }
-
-        private static LoadedLuaScript LoadScript(string script)
-        {
-            var preparedScript = LuaScript.Prepare(script);
-            LoadedLuaScript loadedScript = null;
-
-            // load script on all servers
-            // note: only need to store single instance of loaded script as it is a wrapper around the original prepared script
-            foreach (var server in _redis.Value.GetEndPoints().Select(x => _redis.Value.GetServer(x)))
-            {
-                loadedScript = preparedScript.Load(server);
-            }
-
-            return loadedScript;
         }
     }
 }
