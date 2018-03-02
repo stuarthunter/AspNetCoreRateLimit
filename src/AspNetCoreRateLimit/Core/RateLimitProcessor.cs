@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using AspNetCoreRateLimit.Models;
 using AspNetCoreRateLimit.Store;
 using Microsoft.AspNetCore.Http;
@@ -23,11 +24,11 @@ namespace AspNetCoreRateLimit.Core
 
         public abstract List<RateLimitRule> GetMatchingRules(ClientRequest clientRequest);
 
-        public RateLimitResult ProcessRequest(ClientRequest requestIdentity, RateLimitRule rule)
+        public async Task<RateLimitResult> ProcessRequestAsync(ClientRequest requestIdentity, RateLimitRule rule)
         {
             var key = ComputeCounterKey(requestIdentity, rule);
             //var keyHash = ComputeKeyHash(key);
-            return _counterStore.AddRequest(key, rule);
+            return await _counterStore.AddRequestAsync(key, rule);
         }
 
         public virtual ClientRequest GetClientRequest(HttpContext httpContext)

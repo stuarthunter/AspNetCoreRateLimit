@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using AspNetCoreRateLimit.Models;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -14,7 +15,7 @@ namespace AspNetCoreRateLimit.Store
             _memoryCache = memoryCache;
         }
 
-        public RateLimitResult AddRequest(string id, RateLimitRule rule)
+        public Task<RateLimitResult> AddRequestAsync(string id, RateLimitRule rule)
         {
             var counter = Get(id);
             if (counter == null || counter.IsExpired)
@@ -28,17 +29,17 @@ namespace AspNetCoreRateLimit.Store
                         counter = new RateLimitCounter(rule.UseSlidingExpiration, rule.PeriodTimeSpan);
                         Set(id, counter, rule.PeriodTimeSpan, rule.UseSlidingExpiration);
 
-                        return new RateLimitResult
+                        return Task.FromResult(new RateLimitResult
                         {
                             Success = true,
                             Remaining = rule.Limit - 1,
                             Expiry = DateTime.UtcNow.Add(rule.PeriodTimeSpan)
-                        };
+                        });
                     }
                 }
             }
 
-            return counter.AddRequest(rule.Limit);
+            return Task.FromResult(counter.AddRequest(rule.Limit));
         }
 
         private RateLimitCounter Get(string id)

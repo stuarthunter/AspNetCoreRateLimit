@@ -1,4 +1,8 @@
-﻿using System;
+﻿// Lua scripting reference: https://www.redisgreen.net/blog/intro-to-lua-for-redis-programmers/
+
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using AspNetCoreRateLimit.Models;
 using StackExchange.Redis;
 
@@ -6,73 +10,82 @@ namespace AspNetCoreRateLimit.Store
 {
     public class RedisRateLimitCounterStore : IRateLimitCounterStore
     {
-        private readonly ConnectionMultiplexer _connection;
-
         private const string IncrementScript = @"
-            local count = redis.call('INCR', KEYS[1])
+            local count = redis.call('INCR', @key)
             if (count == 1) then
-                redis.call('EXPIRE', KEYS[1], ARGV[1])
-                return '1:' .. ARGV[1]
+                redis.call('EXPIRE', @key, @ttl)
+                return '1:' .. @ttl
             end
-            local ttl = redis.call('TTL', KEYS[1])
+            local ttl = redis.call('TTL', @key)
             return count .. ':' .. ttl
             ";
 
         private const string IncrementScriptSliding = @"
-            local exists = redis.call('EXISTS', KEYS[1])
+            local exists = redis.call('EXISTS', @key)
             if (exists == 0) then
-                redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
-                redis.call('EXPIRE', KEYS[1], ARGV[3])
-                return '1:' .. ARGV[1]
+                redis.call('ZADD', @key, @timestamp, @identifier)
+                redis.call('EXPIRE', @key, @ttl)
+                return '1:' .. @timestamp
             end
-			redis.call('EXPIRE', KEYS[1], ARGV[3])
-            redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[4])
-            local count = redis.call('ZCARD', KEYS[1])
-            if (count < tonumber(ARGV[5])) then
-                redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2]);
+			redis.call('EXPIRE', @key, @ttl)
+            redis.call('ZREMRANGEBYSCORE', @key, 0, @minTimestamp)
+            local count = redis.call('ZCARD', @key)
+            if (count < tonumber(@limit)) then
+                redis.call('ZADD', @key, @timestamp, @identifier);
             end
             count = count + 1
-            local minScore = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')[2]
+            local minScore = redis.call('ZRANGE', @key, 0, 0, 'WITHSCORES')[2]
             return count .. ':' .. minScore
             ";
 
+        private static readonly Lazy<LoadedLuaScript> LoadedIncrementScript = new Lazy<LoadedLuaScript>(() => LoadScript(IncrementScript));
+        private static readonly Lazy<LoadedLuaScript> LoadedIncrementScriptSliding = new Lazy<LoadedLuaScript>(() => LoadScript(IncrementScriptSliding));
+
+        // todo: inject singleton Redis ConnectionMultiplexer via DI instead of using lazy static reference
+        private static Lazy<ConnectionMultiplexer> _redis;
+
         public RedisRateLimitCounterStore(string connectionString)
         {
-            _connection = ConnectionMultiplexer.Connect(connectionString);
+            if (_redis == null)
+            {
+                _redis = new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(connectionString));
+            }
         }
 
-        public RateLimitResult AddRequest(string id, RateLimitRule rule)
+        public async Task<RateLimitResult> AddRequestAsync(string id, RateLimitRule rule)
         {
-            var db = _connection.GetDatabase();
-            var key = $"RATELIMIT:{id}";
+            var db = _redis.Value.GetDatabase();
+            var key = $"RATELIMIT::{id}";
             int count;
             DateTime expiry;
 
             if (!rule.UseSlidingExpiration)
             {
-                // todo: convert to async
-                // todo: preload script on server - see https://www.redisgreen.net/blog/intro-to-lua-for-redis-programmers/
-                var ttl = (int) rule.PeriodTimeSpan.TotalSeconds; // ARGV[1]
-                var result = (string) db.ScriptEvaluate(IncrementScript,
-                    new RedisKey[] { key }, new RedisValue[] { ttl });
-
-                var parts = result.Split(':');
+                var result = await LoadedIncrementScript.Value.EvaluateAsync(db, new
+                {
+                    key = (RedisKey) key,
+                    ttl = (int) rule.PeriodTimeSpan.TotalSeconds
+                });
+                
+                var parts = ((string) result).Split(':');
                 count = int.Parse(parts[0]);
                 expiry = DateTime.UtcNow.AddSeconds(int.Parse(parts[1]));
             }
             else
             {
-                var timestamp = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond; // ARGV[1]
-                var identifier = Guid.NewGuid().ToString(); // ARGV[2]
-                var ttl = (int) rule.PeriodTimeSpan.TotalSeconds; // ARGV[3]
-                var minTimestamp = DateTime.UtcNow.Subtract(rule.PeriodTimeSpan).Ticks / TimeSpan.TicksPerMillisecond; // ARGV[4]
-                var limit = rule.Limit;  // ARGV[5]
-                var result = (string)db.ScriptEvaluate(IncrementScriptSliding,
-                    new RedisKey[] { key }, new RedisValue[] { timestamp, identifier, ttl, minTimestamp, limit });
+                var result = await LoadedIncrementScriptSliding.Value.EvaluateAsync(db, new
+                {
+                    key = (RedisKey) key,
+                    timestamp = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond,
+                    identifier = Guid.NewGuid().ToString(),
+                    ttl = (int) rule.PeriodTimeSpan.TotalSeconds,
+                    minTimestamp = DateTime.UtcNow.Subtract(rule.PeriodTimeSpan).Ticks / TimeSpan.TicksPerMillisecond,
+                    limit = rule.Limit
+                });
 
-                var parts = result.Split(':');
+                var parts = ((string) result).Split(':');
                 count = int.Parse(parts[0]);
-                expiry = new DateTime(long.Parse(parts[1]) * TimeSpan.TicksPerMillisecond).ToUniversalTime().Add(rule.PeriodTimeSpan);
+                expiry = new DateTime(long.Parse(parts[1]) * TimeSpan.TicksPerMillisecond, DateTimeKind.Utc).Add(rule.PeriodTimeSpan);
             }
 
             return new RateLimitResult
@@ -81,6 +94,21 @@ namespace AspNetCoreRateLimit.Store
                 Remaining = count <= rule.Limit ? 0 : rule.Limit - count,
                 Expiry = expiry
             };
+        }
+
+        private static LoadedLuaScript LoadScript(string script)
+        {
+            var preparedScript = LuaScript.Prepare(script);
+            LoadedLuaScript loadedScript = null;
+
+            // load script on all servers
+            // note: only need to store single instance of loaded script as it is a wrapper around the original prepared script
+            foreach (var server in _redis.Value.GetEndPoints().Select(x => _redis.Value.GetServer(x)))
+            {
+                loadedScript = preparedScript.Load(server);
+            }
+
+            return loadedScript;
         }
     }
 }

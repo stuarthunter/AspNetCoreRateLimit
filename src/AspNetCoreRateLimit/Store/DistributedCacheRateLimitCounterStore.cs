@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using AspNetCoreRateLimit.Models;
 using Microsoft.Extensions.Caching.Distributed;
 using Newtonsoft.Json;
@@ -14,18 +15,18 @@ namespace AspNetCoreRateLimit.Store
             _memoryCache = memoryCache;
         }
 
-        public RateLimitResult AddRequest(string id, RateLimitRule rule)
+        public async Task<RateLimitResult> AddRequestAsync(string id, RateLimitRule rule)
         {
             // TODO: REQUIRES REVIEW 
             // RateLimitCounter should not be serialised to distributed cache.
             // Directly store underlying data to facilitate atomic distributed updates.
             // REDIS example: http://tech.domain.com.au/2017/11/protect-your-api-resources-with-rate-limiting/
 
-            var counter = Get(id);
+            var counter = await GetAsync(id);
             if (counter == null)
             {
                 counter = new RateLimitCounter(rule.UseSlidingExpiration, rule.PeriodTimeSpan);
-                Set(id, counter, rule.PeriodTimeSpan, rule.UseSlidingExpiration);
+                await SetAsync(id, counter, rule.PeriodTimeSpan, rule.UseSlidingExpiration);
 
                 return new RateLimitResult
                 {
@@ -38,15 +39,15 @@ namespace AspNetCoreRateLimit.Store
             return counter.AddRequest(rule.Limit);
         }
 
-        private RateLimitCounter Get(string id)
+        private async Task<RateLimitCounter> GetAsync(string id)
         {
-            var stored = _memoryCache.GetString(id);
+            var stored = await _memoryCache.GetStringAsync(id);
             return !string.IsNullOrEmpty(stored) 
                 ? JsonConvert.DeserializeObject<RateLimitCounter>(stored) 
                 : null;
         }
 
-        private void Set(string id, RateLimitCounter counter, TimeSpan expirationPeriod, bool slidingExpiration)
+        private async Task SetAsync(string id, RateLimitCounter counter, TimeSpan expirationPeriod, bool slidingExpiration)
         {
             var options = new DistributedCacheEntryOptions();
             if (slidingExpiration)
@@ -57,7 +58,7 @@ namespace AspNetCoreRateLimit.Store
             {
                 options.SetAbsoluteExpiration(expirationPeriod);
             }
-            _memoryCache.SetString(id, JsonConvert.SerializeObject(counter), options);
+            await _memoryCache.SetStringAsync(id, JsonConvert.SerializeObject(counter), options);
         }
     }
 }

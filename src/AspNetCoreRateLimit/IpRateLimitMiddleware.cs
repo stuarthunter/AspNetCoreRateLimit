@@ -76,7 +76,7 @@ namespace AspNetCoreRateLimit
                 }
 
                 // process request
-                result = _processor.ProcessRequest(identity, rule);
+                result = await _processor.ProcessRequestAsync(identity, rule);
 
                 // check if limit is exceeded
                 if (!result.Success)

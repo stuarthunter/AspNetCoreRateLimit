@@ -1,9 +1,10 @@
-﻿using AspNetCoreRateLimit.Models;
+﻿using System.Threading.Tasks;
+using AspNetCoreRateLimit.Models;
 
 namespace AspNetCoreRateLimit.Store
 {
     public interface IRateLimitCounterStore
     {
-        RateLimitResult AddRequest(string id, RateLimitRule rule);
+        Task<RateLimitResult> AddRequestAsync(string id, RateLimitRule rule);
     }
 }

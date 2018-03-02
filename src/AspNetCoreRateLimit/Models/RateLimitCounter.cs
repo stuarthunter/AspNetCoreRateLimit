@@ -75,7 +75,7 @@ namespace AspNetCoreRateLimit.Models
                 count = _requests.Count;
                 // calculate expiry from timestamp of first request inside period
                 expiry = timestamp > 0 
-                    ? new DateTime(timestamp * TimeSpan.TicksPerMillisecond).ToUniversalTime().Add(_period) 
+                    ? new DateTime(timestamp * TimeSpan.TicksPerMillisecond, DateTimeKind.Utc).Add(_period) 
                     : DateTime.UtcNow.Add(_period);
             }
             else
