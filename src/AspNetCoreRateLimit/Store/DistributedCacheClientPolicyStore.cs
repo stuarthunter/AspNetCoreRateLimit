@@ -7,6 +7,11 @@ namespace AspNetCoreRateLimit.Store
 {
     public class DistributedCacheClientPolicyStore : IClientPolicyStore
     {
+        // TODO: REQUIRES REVIEW 
+        // No need to fetch from remote store for every request
+        // Cache locally for 1 min?
+        // Existing stored values will be overwritten on startup
+
         private readonly IDistributedCache _memoryCache;
 
         public DistributedCacheClientPolicyStore(IDistributedCache memoryCache, 
@@ -43,10 +48,6 @@ namespace AspNetCoreRateLimit.Store
 
         public ClientRateLimitPolicy Get(string id)
         {
-            // TODO: REQUIRES REVIEW 
-            // No need to fetch from remote store for every request
-            // Cache locally for 1 min?
-
             var stored = _memoryCache.GetString(id);
             if (!string.IsNullOrEmpty(stored))
             {

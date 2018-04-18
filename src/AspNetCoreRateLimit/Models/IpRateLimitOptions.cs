@@ -10,7 +10,7 @@ namespace AspNetCoreRateLimit.Models
         public string RealIpHeader { get; set; } = "X-Real-IP";
 
         /// <summary>
-        /// Gets or sets the policy prefix, used to compose the client policy cache key
+        /// Gets or sets the policy prefix, used to compose the IP policy cache key
         /// </summary>
         public string IpPolicyPrefix { get; set; } = "ippp";
 

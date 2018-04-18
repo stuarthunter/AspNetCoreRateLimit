@@ -11,11 +11,14 @@ namespace AspNetCoreRateLimit.Helpers
         private readonly Lazy<ConnectionMultiplexer> _redis;
         private readonly Dictionary<string, Lazy<LoadedLuaScript>> _scripts = new Dictionary<string, Lazy<LoadedLuaScript>>();
 
-        // TODO: set connection string using IOptions
-
-        public RedisConnection(string connectionString)
+        public RedisConnection(string configuration)
         {
-            _redis = new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(connectionString));
+            _redis = new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(configuration));
+        }
+
+        public RedisConnection(ConfigurationOptions options)
+        {
+            _redis = new Lazy<ConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(options));
         }
 
         public IDatabase Database => _redis.Value.GetDatabase();

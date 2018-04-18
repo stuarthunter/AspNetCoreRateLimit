@@ -7,6 +7,12 @@ namespace AspNetCoreRateLimit.Store
 {
     public class DistributedCacheIpPolicyStore : IIpPolicyStore
     {
+        // TODO: REQUIRES REVIEW 
+        // No need to fetch from remote store for every request
+        // Cache locally for 1 min?
+        // IpAddressRange not persisted
+        // Existing stored values will be overwritten on startup
+
         private readonly IDistributedCache _memoryCache;
 
         public DistributedCacheIpPolicyStore(IDistributedCache memoryCache, 
@@ -35,11 +41,6 @@ namespace AspNetCoreRateLimit.Store
 
         public IpRateLimitPolicies Get(string id)
         {
-            // TODO: REQUIRES REVIEW 
-            // No need to fetch from remote remote store for every request
-            // Cache locally for 1 min?
-            // IpAddressRange not persisted
-
             var stored = _memoryCache.GetString(id);
             if (!string.IsNullOrEmpty(stored))
             {
