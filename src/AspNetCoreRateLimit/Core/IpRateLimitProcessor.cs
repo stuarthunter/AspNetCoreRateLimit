@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using AspNetCoreRateLimit.Models;
 using AspNetCoreRateLimit.Net;
 using AspNetCoreRateLimit.Store;
-using Microsoft.AspNetCore.Http;
 
 namespace AspNetCoreRateLimit.Core
 {
@@ -12,18 +11,15 @@ namespace AspNetCoreRateLimit.Core
     {
         private readonly IpRateLimitOptions _options;
         private readonly IIpPolicyStore _policyStore;
-        private readonly IIpAddressParser _ipParser;
         private readonly List<IpAddressRange> _ipAddressRangeWhitelist;
 
         public IpRateLimitProcessor(IpRateLimitOptions options,
             IRateLimitCounterStore counterStore,
-            IIpPolicyStore policyStore,
-            IIpAddressParser ipParser)
+            IIpPolicyStore policyStore)
             : base(options, counterStore)
         {
             _options = options;
             _policyStore = policyStore;
-            _ipParser = ipParser;
 
             // parse IP whitelist
             if (_options.IpWhitelist != null)
@@ -34,7 +30,7 @@ namespace AspNetCoreRateLimit.Core
 
         public override string ComputeCounterKey(ClientRequest clientRequest, RateLimitRule rule)
         {
-            return $"{_options.RateLimitCounterPrefix}_{clientRequest.ClientIp}_{rule.Period}{(rule.UseSlidingExpiration ? "*" : "")}_{rule.Endpoint}";
+            return $"{_options.RateLimitCounterPrefix}_{clientRequest.ClientIpAddress}_{rule.Period}{(rule.UseSlidingExpiration ? "*" : "")}_{rule.Endpoint}";
         }
 
         public override List<RateLimitRule> GetMatchingRules(ClientRequest clientRequest)
@@ -47,9 +43,8 @@ namespace AspNetCoreRateLimit.Core
             if (policies?.IpRules != null && policies.IpRules.Any())
             {
                 // search for rules with IP intervals containing client IP
-                var clientIp = _ipParser.ParseIp(clientRequest.ClientIp);
                 var policyRules = new RateLimitRules();
-                policyRules.AddRange(policies.IpRules.Where(x => x.IpAddressRange.Contains(clientIp)).SelectMany(x => x.Rules));
+                policyRules.AddRange(policies.IpRules.Where(x => x.IpAddressRange.Contains(clientRequest.ClientIpAddress)).SelectMany(x => x.Rules));
 
                 if (policyRules.Any())
                 {
@@ -82,19 +77,6 @@ namespace AspNetCoreRateLimit.Core
             return result;
         }
 
-        public override ClientRequest GetClientRequest(HttpContext httpContext)
-        {
-            var clientRequest = base.GetClientRequest(httpContext);
-
-            var clientIp = _ipParser.GetClientIp(httpContext);
-            if (clientIp != null)
-            {
-                clientRequest.ClientIp = clientIp.ToString();
-            }
-
-            return clientRequest;
-        }
-
         public override bool IsWhitelisted(ClientRequest clientRequest)
         {
             if (base.IsWhitelisted(clientRequest))
@@ -102,16 +84,9 @@ namespace AspNetCoreRateLimit.Core
                 return true;
             }
 
-            if (_ipAddressRangeWhitelist != null)
-            {
-                var clientIp = _ipParser.ParseIp(clientRequest.ClientIp);
-                if (_ipAddressRangeWhitelist.Any(x => x.Contains(clientIp)))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return _ipAddressRangeWhitelist != null 
+                && !clientRequest.ClientIpAddress.Equals(IPAddress.None) 
+                && _ipAddressRangeWhitelist.Any(x => x.Contains(clientRequest.ClientIpAddress));
         }
     }
 }

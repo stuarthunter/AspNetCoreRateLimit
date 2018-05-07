@@ -6,8 +6,8 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using AspNetCoreRateLimit.Core;
+using AspNetCoreRateLimit.Extensions;
 using AspNetCoreRateLimit.Models;
-using AspNetCoreRateLimit.Net;
 using AspNetCoreRateLimit.Store;
 
 namespace AspNetCoreRateLimit
@@ -23,13 +23,12 @@ namespace AspNetCoreRateLimit
             IOptions<IpRateLimitOptions> options,
             IRateLimitCounterStore counterStore,
             IIpPolicyStore policyStore,
-            ILogger<IpRateLimitMiddleware> logger,
-            IIpAddressParser ipParser = null)
+            ILogger<IpRateLimitMiddleware> logger)
         {
             _next = next;
             _options = options.Value;
             _logger = logger;
-            _processor = new IpRateLimitProcessor(_options, counterStore, policyStore, ipParser ?? new ReverseProxyIpParser(_options.RealIpHeader));
+            _processor = new IpRateLimitProcessor(_options, counterStore, policyStore);
         }
 
         public async Task Invoke(HttpContext httpContext)
@@ -42,25 +41,16 @@ namespace AspNetCoreRateLimit
             }
 
             // get request details
-            var identity = _processor.GetClientRequest(httpContext);
-
-            // check that we have client IP adress
-            if (string.IsNullOrEmpty(identity.ClientIp))
-            {
-                // TODO: log failure to identity client IP 
-
-                await _next.Invoke(httpContext);
-                return;
-            }
+            var clientRequest = httpContext.GetClientRequest(_options.ClientIdHeader, _options.RealIpHeader);
 
             // check white list
-            if (_processor.IsWhitelisted(identity))
+            if (_processor.IsWhitelisted(clientRequest))
             {
                 await _next.Invoke(httpContext);
                 return;
             }
 
-            var rules = _processor.GetMatchingRules(identity);
+            var rules = _processor.GetMatchingRules(clientRequest);
             RateLimitResult result = null;
             foreach (var rule in rules)
             {
@@ -68,7 +58,7 @@ namespace AspNetCoreRateLimit
                 if (rule.Limit <= 0)
                 {
                     // log blocked request
-                    LogBlockedRequest(httpContext, identity, rule);
+                    LogBlockedRequest(httpContext, clientRequest, rule);
 
                     // return quote exceeded
                     await ReturnQuotaExceededResponse(httpContext, rule);
@@ -76,7 +66,7 @@ namespace AspNetCoreRateLimit
                 }
 
                 // process request
-                result = await _processor.ProcessRequestAsync(identity, rule);
+                result = await _processor.ProcessRequestAsync(clientRequest, rule);
 
                 // check if limit is exceeded
                 if (!result.Success)
@@ -86,7 +76,7 @@ namespace AspNetCoreRateLimit
                         .ToString(CultureInfo.InvariantCulture);
 
                     // log blocked request
-                    LogBlockedRequest(httpContext, identity, rule);
+                    LogBlockedRequest(httpContext, clientRequest, rule);
 
                     // return quote exceeded
                     await ReturnQuotaExceededResponse(httpContext, rule, retryAfter);
@@ -124,12 +114,7 @@ namespace AspNetCoreRateLimit
             await _next.Invoke(httpContext);
         }
 
-        private Task ReturnQuotaExceededResponse(HttpContext httpContext, RateLimitRule rule)
-        {
-            return ReturnQuotaExceededResponse(httpContext, rule, null);
-        }
-
-        private Task ReturnQuotaExceededResponse(HttpContext httpContext, RateLimitRule rule, string retryAfter)
+        private Task ReturnQuotaExceededResponse(HttpContext httpContext, RateLimitRule rule, string retryAfter = null)
         {
             var message = string.IsNullOrEmpty(_options.QuotaExceededMessage) ? $"API calls quota exceeded! maximum admitted {rule.Limit} per {rule.Period}." : _options.QuotaExceededMessage;
 
@@ -144,7 +129,7 @@ namespace AspNetCoreRateLimit
 
         private void LogBlockedRequest(HttpContext httpContext, ClientRequest identity, RateLimitRule rule)
         {
-            _logger.LogInformation($"Request {identity.HttpVerb}:{identity.Path} from IP {identity.ClientIp} has been blocked, quota {rule.Limit}/{rule.Period} exceeded. Blocked by rule {rule.Endpoint}. TraceIdentifier {httpContext.TraceIdentifier}.");
+            _logger.LogInformation($"Request {identity.HttpVerb}:{identity.Path} from IP {identity.ClientIpAddress} has been blocked, quota {rule.Limit}/{rule.Period} exceeded. Blocked by rule {rule.Endpoint}. TraceIdentifier {httpContext.TraceIdentifier}.");
         }
     }
 }

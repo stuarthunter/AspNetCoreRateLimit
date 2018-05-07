@@ -1,4 +1,5 @@
-﻿
+﻿using System.Net;
+
 namespace AspNetCoreRateLimit.Models
 {
     /// <summary>
@@ -6,7 +7,7 @@ namespace AspNetCoreRateLimit.Models
     /// </summary>
     public class ClientRequest
     {
-        public string ClientIp { get; set; }
+        public IPAddress ClientIpAddress { get; set; }
 
         public string ClientId { get; set; }
 

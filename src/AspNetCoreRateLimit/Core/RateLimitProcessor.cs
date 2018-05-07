@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using AspNetCoreRateLimit.Models;
 using AspNetCoreRateLimit.Store;
-using Microsoft.AspNetCore.Http;
 
 namespace AspNetCoreRateLimit.Core
 {
@@ -29,22 +28,6 @@ namespace AspNetCoreRateLimit.Core
             var key = ComputeCounterKey(requestIdentity, rule);
             //var keyHash = ComputeKeyHash(key);
             return await _counterStore.AddRequestAsync(key, rule);
-        }
-
-        public virtual ClientRequest GetClientRequest(HttpContext httpContext)
-        {
-            var clientId = "(anon)";
-            if (httpContext.Request.Headers.Keys.Contains(_options.ClientIdHeader, StringComparer.OrdinalIgnoreCase))
-            {
-                clientId = httpContext.Request.Headers[_options.ClientIdHeader].First();
-            }
-
-            return new ClientRequest
-            {
-                ClientId = clientId,
-                HttpVerb = httpContext.Request.Method.ToLower(),
-                Path = httpContext.Request.Path.ToString().ToLower()
-            };
         }
 
         public virtual bool IsWhitelisted(ClientRequest clientRequest)

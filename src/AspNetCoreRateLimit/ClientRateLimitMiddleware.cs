@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using AspNetCoreRateLimit.Core;
+using AspNetCoreRateLimit.Extensions;
 using AspNetCoreRateLimit.Models;
 using AspNetCoreRateLimit.Store;
 
@@ -41,7 +42,7 @@ namespace AspNetCoreRateLimit
             }
 
             // get request details
-            var clientRequest = _processor.GetClientRequest(httpContext);
+            var clientRequest = httpContext.GetClientRequest(_options.ClientIdHeader);
 
             // check white list
             if (_processor.IsWhitelisted(clientRequest))
