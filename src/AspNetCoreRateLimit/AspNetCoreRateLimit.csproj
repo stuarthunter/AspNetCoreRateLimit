@@ -28,4 +28,8 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\AspNetRateLimit.Common\AspNetRateLimit.Common.csproj" />
+  </ItemGroup>
+
 </Project>

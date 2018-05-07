@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using AspNetCoreRateLimit.Models;
-using AspNetCoreRateLimit.Store;
+using AspNetRateLimit.Common.Models;
+using AspNetRateLimit.Common.Store;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 

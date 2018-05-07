@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using AspNetCoreRateLimit.Models;
+using AspNetRateLimit.Common.Models;
+using AspNetRateLimit.Common.Store;
 using Microsoft.Extensions.Caching.Distributed;
 using Newtonsoft.Json;
 

@@ -5,10 +5,10 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using AspNetCoreRateLimit.Core;
 using AspNetCoreRateLimit.Extensions;
-using AspNetCoreRateLimit.Models;
-using AspNetCoreRateLimit.Store;
+using AspNetRateLimit.Common.Models;
+using AspNetRateLimit.Common;
+using AspNetRateLimit.Common.Store;
 
 namespace AspNetCoreRateLimit
 {

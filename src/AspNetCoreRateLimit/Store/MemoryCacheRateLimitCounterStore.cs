@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Threading.Tasks;
-using AspNetCoreRateLimit.Models;
+using AspNetRateLimit.Common.Models;
+using AspNetRateLimit.Common.Store;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace AspNetCoreRateLimit.Store
 {
-    public class MemoryCacheRateLimitCounterStore: IRateLimitCounterStore
+    public class MemoryCacheRateLimitCounterStore : IRateLimitCounterStore
     {
         private readonly IMemoryCache _memoryCache;
         private readonly object _lock = new object();

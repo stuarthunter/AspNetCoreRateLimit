@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Linq;
 using System.Net;
+using AspNetRateLimit.Common.Models;
 using Microsoft.AspNetCore.Http;
 
 namespace AspNetCoreRateLimit.Extensions
 {
     public static class HttpContextExtensions
     {
-        public static Models.ClientRequest GetClientRequest(this HttpContext httpContext, string clientIdHeader)
+        public static ClientRequest GetClientRequest(this HttpContext httpContext, string clientIdHeader)
         {
             var clientId = "(anon)";
             if (!string.IsNullOrEmpty(clientIdHeader) && httpContext.Request.Headers.Keys.Contains(clientIdHeader, StringComparer.OrdinalIgnoreCase))
@@ -19,7 +20,7 @@ namespace AspNetCoreRateLimit.Extensions
                 }
             }
 
-            return new Models.ClientRequest
+            return new ClientRequest
             {
                 ClientIpAddress = null,
                 ClientId = clientId,
@@ -28,7 +29,7 @@ namespace AspNetCoreRateLimit.Extensions
             };
         }
 
-        public static Models.ClientRequest GetClientRequest(this HttpContext httpContext, string clientIdHeader, string realIpHeader)
+        public static ClientRequest GetClientRequest(this HttpContext httpContext, string clientIdHeader, string realIpHeader)
         {
             var result = GetClientRequest(httpContext, clientIdHeader);
 

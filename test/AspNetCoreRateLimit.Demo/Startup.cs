@@ -1,5 +1,7 @@
-﻿using AspNetCoreRateLimit.Models;
+﻿using AspNetCoreRateLimit.Helpers;
 using AspNetCoreRateLimit.Store;
+using AspNetRateLimit.Common.Models;
+using AspNetRateLimit.Common.Store;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -27,12 +29,16 @@ namespace AspNetCoreRateLimit.Demo
         {
             services.AddOptions();
             services.AddMemoryCache();
-
+            
+            //services.AddSingleton(c => new RedisConnection(Configuration.GetConnectionString("Redis")));
+            services.AddSingleton(c => new RedisConnection("localhost:6379"));
+            
             //configure ip rate limiting middle-ware
             services.Configure<IpRateLimitOptions>(Configuration.GetSection("IpRateLimiting"));
             services.Configure<IpRateLimitPolicies>(Configuration.GetSection("IpRateLimitPolicies"));
             services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
             services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+            //services.AddSingleton<IRateLimitCounterStore, RedisRateLimitCounterStore>();
 
             //configure client rate limiting middleware
             services.Configure<ClientRateLimitOptions>(Configuration.GetSection("ClientRateLimiting"));
@@ -40,8 +46,8 @@ namespace AspNetCoreRateLimit.Demo
             services.AddSingleton<IClientPolicyStore, MemoryCacheClientPolicyStore>();
             //services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
 
-            var opt = new ClientRateLimitOptions();
-            ConfigurationBinder.Bind(Configuration.GetSection("ClientRateLimiting"), opt);
+            //var opt = new ClientRateLimitOptions();
+            //ConfigurationBinder.Bind(Configuration.GetSection("ClientRateLimiting"), opt);
 
             // Add framework services.
             services.AddMvc();

@@ -3,7 +3,8 @@
 using System;
 using System.Threading.Tasks;
 using AspNetCoreRateLimit.Helpers;
-using AspNetCoreRateLimit.Models;
+using AspNetRateLimit.Common.Models;
+using AspNetRateLimit.Common.Store;
 using StackExchange.Redis;
 
 namespace AspNetCoreRateLimit.Store
